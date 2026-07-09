@@ -1,0 +1,10 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file alias="chathub_icon.svg">chathub_icon.svg</file>
+        <file alias="chathub_icon.png">chathub_icon.png</file>
+        <file alias="chathub_icon.ico">chathub_icon.ico</file>
+        <file alias="my_icon_light.ico">my_icon_light.ico</file>
+        <file alias="my_icon_light_ui.png">my_icon_light_ui.png</file>
+        <file alias="my_icon_dark_ui.png">my_icon_dark_ui.png</file>
+    </qresource>
+</RCC>
