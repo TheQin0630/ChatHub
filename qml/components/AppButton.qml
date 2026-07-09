@@ -9,16 +9,13 @@ Button {
     property color foreground: theme.accentText
     property bool glass: fill === "transparent"
 
-    implicitHeight: 42
-    font.pixelSize: 14
-    font.weight: Font.DemiBold
+    implicitHeight: 36
+    leftPadding: 16
+    rightPadding: 16
+    font.pixelSize: 13
+    font.weight: Font.Normal
     hoverEnabled: true
     opacity: enabled ? 1.0 : 0.55
-    scale: pressed ? 0.965 : (hovered ? 1.015 : 1.0)
-
-    Behavior on scale {
-        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-    }
 
     Behavior on opacity {
         NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
@@ -31,9 +28,11 @@ Button {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
+        renderType: Text.CurveRendering
     }
 
     background: Rectangle {
+        antialiasing: true
         radius: height / 2
         color: control.enabled
                ? (control.glass ? (control.hovered ? control.theme.buttonGlassHover : control.theme.buttonGlassBg) : (control.hovered ? control.hoverFill : control.fill))

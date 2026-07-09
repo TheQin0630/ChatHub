@@ -6,60 +6,55 @@ ComboBox {
     required property var theme
 
     textRole: "topic"
-    implicitHeight: 44
-    font.pixelSize: 14
+    implicitHeight: 38
+    font.pixelSize: 13
+    font.weight: Font.Normal
     hoverEnabled: true
 
     contentItem: Text {
-        leftPadding: 16
+        leftPadding: 14
         rightPadding: 48
         text: control.displayText
         color: control.enabled ? control.theme.comboText : control.theme.muted
         font: control.font
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
+        renderType: Text.CurveRendering
     }
 
     indicator: Rectangle {
-        width: 28
-        height: 28
-        radius: 14
-        x: control.width - width - 8
+        antialiasing: true
+        width: 30
+        height: 30
+        radius: 15
+        x: control.width - width - 6
         y: control.height / 2 - height / 2
-        color: control.enabled ? control.theme.accent : control.theme.buttonDisabledBg
+        color: control.enabled ? (control.hovered || control.popup.visible ? control.theme.accentSoft : control.theme.surfaceAlt) : control.theme.buttonDisabledBg
+        border.color: control.enabled ? control.theme.glassBorder : "transparent"
+        border.width: 1
         opacity: control.enabled ? 1 : 0.7
-        scale: control.pressed ? 0.92 : 1
 
-        Rectangle {
-            width: 12
-            height: 2
-            radius: 1
+        Text {
             anchors.centerIn: parent
-            color: control.theme.accentText
-        }
-
-        Rectangle {
-            width: 2
-            height: 12
-            radius: 1
-            anchors.centerIn: parent
-            color: control.theme.accentText
+            text: "+"
+            color: control.enabled ? control.theme.accent : control.theme.muted
+            font.pixelSize: 18
+            font.weight: Font.Medium
+            renderType: Text.CurveRendering
         }
 
         Behavior on color {
             ColorAnimation { duration: 180; easing.type: Easing.OutCubic }
         }
 
-        Behavior on scale {
-            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
-        }
     }
 
     background: Rectangle {
+        antialiasing: true
         radius: height / 2
         color: control.enabled ? (control.hovered || control.popup.visible ? control.theme.comboHoverBg : control.theme.comboBg) : control.theme.fieldDisabledBg
         border.color: control.activeFocus || control.popup.visible ? control.theme.accent : control.theme.fieldBorder
-        border.width: control.activeFocus || control.popup.visible ? 2 : 1
+        border.width: 1
 
         Behavior on color {
             ColorAnimation { duration: 220; easing.type: Easing.OutCubic }
@@ -76,7 +71,8 @@ ComboBox {
         implicitHeight: Math.min(contentItem.implicitHeight + 12, 260)
         padding: 6
         background: Rectangle {
-            radius: 18
+            antialiasing: true
+            radius: 14
             color: control.theme.comboPopupBg
             border.color: control.theme.line
             border.width: 1
@@ -91,17 +87,19 @@ ComboBox {
 
     delegate: ItemDelegate {
         width: control.width - 12
-        height: 38
+        height: 34
         highlighted: control.highlightedIndex === index
         contentItem: Text {
             text: model.topic
             color: control.theme.comboText
-            font.pixelSize: 14
+            font.pixelSize: 13
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
+            renderType: Text.CurveRendering
         }
         background: Rectangle {
-            radius: 12
+            antialiasing: true
+            radius: 10
             color: highlighted ? control.theme.popupHighlight : "transparent"
 
             Behavior on color {

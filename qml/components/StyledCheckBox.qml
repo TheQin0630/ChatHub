@@ -1,4 +1,4 @@
-﻿import QtQuick
+import QtQuick
 import QtQuick.Controls.Basic
 
 CheckBox {
@@ -6,10 +6,11 @@ CheckBox {
     required property var theme
     property string description: ""
 
-    font.pixelSize: 14
-    spacing: 9
+    font.pixelSize: 13
+    font.weight: Font.Normal
+    spacing: 8
     hoverEnabled: true
-    implicitHeight: Math.max(32, checkContent.implicitHeight)
+    implicitHeight: Math.max(32, checkContent.implicitHeight + 2)
 
     contentItem: Column {
         id: checkContent
@@ -22,6 +23,7 @@ CheckBox {
             font: control.font
             color: control.enabled ? control.theme.text : control.theme.subtext
             elide: Text.ElideRight
+            renderType: Text.CurveRendering
         }
 
         Text {
@@ -32,6 +34,7 @@ CheckBox {
             color: control.theme.subtext
             font.pixelSize: 11
             wrapMode: Text.WordWrap
+            renderType: Text.CurveRendering
 
             Behavior on opacity {
                 NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
@@ -40,48 +43,27 @@ CheckBox {
     }
 
     indicator: Rectangle {
-        implicitWidth: 24
-        implicitHeight: 24
+        antialiasing: true
+        implicitWidth: 20
+        implicitHeight: 20
         x: control.leftPadding
-        y: 4
-        radius: width / 2
+        y: 5
+        radius: 5
         border.color: control.checked ? control.theme.accent : (control.hovered ? control.theme.subtext : control.theme.line)
-        border.width: control.checked ? 0 : 1
+        border.width: 1
         color: control.checked ? control.theme.accent : control.theme.checkboxBg
 
-        Item {
+        Text {
             anchors.centerIn: parent
-            width: 13
-            height: 10
+            text: "✓"
+            color: control.theme.accentText
+            font.pixelSize: 13
+            font.weight: Font.Medium
             opacity: control.checked ? 1 : 0
-            scale: control.checked ? 1 : 0.45
-
-            Rectangle {
-                width: 5
-                height: 2
-                radius: 1
-                color: control.theme.accentText
-                x: 1
-                y: 6
-                rotation: 45
-            }
-
-            Rectangle {
-                width: 10
-                height: 2
-                radius: 1
-                color: control.theme.accentText
-                x: 4
-                y: 5
-                rotation: -45
-            }
+            renderType: Text.CurveRendering
 
             Behavior on opacity {
                 NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
-            }
-
-            Behavior on scale {
-                NumberAnimation { duration: 180; easing.type: Easing.OutBack }
             }
         }
 

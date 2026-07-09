@@ -5,10 +5,10 @@ TabButton {
     id: control
     required property var theme
 
-    implicitHeight: 46
+    implicitHeight: 34
     hoverEnabled: true
-    font.pixelSize: 14
-    font.weight: checked ? Font.DemiBold : Font.Normal
+    font.pixelSize: 13
+    font.weight: checked ? Font.Medium : Font.Normal
 
     contentItem: Text {
         text: control.text
@@ -17,12 +17,14 @@ TabButton {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
+        renderType: Text.CurveRendering
     }
 
     background: Rectangle {
-        radius: 18
+        antialiasing: true
+        radius: height / 2
         color: control.checked ? control.theme.accent : (control.hovered ? control.theme.tabHover : "transparent")
-        border.color: control.checked ? "transparent" : control.theme.tabBorder
-        border.width: control.checked ? 0 : 1
+        border.color: "transparent"
+        border.width: 0
     }
 }

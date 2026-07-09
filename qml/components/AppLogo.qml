@@ -4,13 +4,14 @@ Item {
     id: root
     required property var theme
 
-    implicitWidth: 42
-    implicitHeight: 42
+    implicitWidth: 44
+    implicitHeight: 44
 
     Rectangle {
+        antialiasing: true
         anchors.fill: parent
-        radius: 8
-        color: root.theme.surfaceAlt
+        radius: 14
+        color: "#fff7ef"
         border.color: root.theme.line
         border.width: 1
 
@@ -24,15 +25,15 @@ Item {
     }
 
     Image {
-        anchors.centerIn: parent
-        width: 36
-        height: 36
-        source: "qrc:/icons/my_icon_light_ui.png"
+        anchors.fill: parent
+        anchors.margins: 1
+        source: "image://appicons/logo"
+        sourceClipRect: Qt.rect(9, 10, 110, 108)
         fillMode: Image.PreserveAspectFit
         cache: true
         smooth: true
         mipmap: true
-        sourceSize.width: 96
-        sourceSize.height: 96
+        sourceSize.width: 128
+        sourceSize.height: 128
     }
 }

@@ -65,9 +65,11 @@ Rectangle {
         logScrollTimer.restart()
     }
 
-    color: theme.surface
+    color: theme.panel
     border.color: theme.line
     border.width: 1
+    radius: 20
+    antialiasing: true
 
     Timer {
         id: logScrollTimer
@@ -82,8 +84,8 @@ Rectangle {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 16
-        spacing: 12
+        anchors.margins: 18
+        spacing: 14
 
         SectionTitle {
             theme: root.theme
@@ -93,8 +95,15 @@ Rectangle {
         TabBar {
             id: rightTabs
             Layout.fillWidth: true
-            spacing: 8
-            background: Item {}
+            padding: 4
+            spacing: 4
+            background: Rectangle {
+                radius: height / 2
+                color: root.theme.surfaceAlt
+                border.color: root.theme.line
+                border.width: 1
+                antialiasing: true
+            }
             StyledTabButton { theme: root.theme; text: root.chineseMode ? "概览" : "Overview" }
             StyledTabButton { theme: root.theme; text: root.chineseMode ? "服务端" : "Server" }
             StyledTabButton { theme: root.theme; text: root.chineseMode ? "日志" : "Logs" }
@@ -119,215 +128,305 @@ Rectangle {
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 104
-                        radius: 8
-                        color: root.theme.elevated
+                        Layout.preferredHeight: 132
+                        radius: 16
+                        color: root.theme.panelAlt
                         border.color: root.theme.line
+                        border.width: 1
+                        antialiasing: true
+
                         ColumnLayout {
                             anchors.fill: parent
-                            anchors.margins: 12
-                            spacing: 4
-                            Label {
-                                text: root.chatController.connected ? (root.chineseMode ? "已连接" : "Connected") : (root.chineseMode ? "未连接" : "Disconnected")
-                                color: root.chatController.connected ? root.theme.success : root.theme.subtext
-                                font.pixelSize: 18
-                                font.weight: Font.Bold
-                            }
-                            Label {
-                                Layout.fillWidth: true
-                                text: root.chineseMode ? ("频道 " + root.channelModel.count + " | 消息 " + root.messageModel.count) : ("Channels " + root.channelModel.count + " | Messages " + root.messageModel.count)
-                                color: root.theme.subtext
-                                font.pixelSize: 13
-                            }
-                            Label {
-                                Layout.fillWidth: true
-                                text: root.currentTopic === "" ? (root.chineseMode ? "当前没有活跃频道" : "No active channel") : ((root.chineseMode ? "当前频道：" : "Active channel: ") + root.currentTopic)
-                                color: root.theme.text
-                                font.pixelSize: 13
-                                elide: Text.ElideRight
-                            }
-                        }
-                    }
+                            anchors.margins: 16
+                            spacing: 8
 
-                    SectionTitle { theme: root.theme; text: root.chineseMode ? "连接规则" : "Connection rules" }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-                        AppButton {
-                            theme: root.theme
-                            Layout.fillWidth: true
-                            text: root.chineseMode ? "刷新连接" : "Refresh Connections"
-                            enabled: root.chatController.connected
-                            onClicked: root.requestConnections()
-                        }
-                        AppButton {
-                            theme: root.theme
-                            Layout.preferredWidth: 94
-                            text: root.chineseMode ? "订阅者" : "Subs"
-                            fill: "transparent"
-                            foreground: root.theme.accent
-                            enabled: root.chatController.connected && ruleTopicInput.text.trim().length > 0
-                            onClicked: root.requestSubscribers(ruleTopicInput.text.trim())
-                        }
-                    }
-
-                    Field {
-                        id: ruleTopicInput
-                        theme: root.theme
-                        Layout.fillWidth: true
-                        text: root.currentTopic
-                        placeholderText: root.chineseMode ? "规则频道" : "Rule topic"
-                        enabled: root.chatController.connected
-                    }
-
-                    Label {
-                        Layout.fillWidth: true
-                        text: root.selectedRuleFd > 0 ? ((root.chineseMode ? "目标 fd " : "Target fd ") + root.selectedRuleFd) : (root.chineseMode ? "请在下方选择 fd" : "Select an fd below")
-                        color: root.selectedRuleFd > 0 ? root.theme.text : root.theme.subtext
-                        font.pixelSize: 12
-                        elide: Text.ElideRight
-                    }
-
-                    ListView {
-                        id: connectionList
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 104
-                        model: root.connectionModel
-                        clip: true
-                        spacing: 6
-                        reuseItems: true
-                        delegate: Rectangle {
-                            width: connectionList.width
-                            height: 38
-                            radius: 8
-                            color: model.fd === root.selectedRuleFd ? root.theme.accentSoft : root.theme.elevated
-                            border.color: model.fd === root.selectedRuleFd ? root.theme.accent : root.theme.line
                             RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 10
-                                anchors.rightMargin: 10
-                                Label {
-                                    Layout.preferredWidth: 58
-                                    text: "fd " + model.fd
-                                    color: root.theme.text
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
+                                Layout.fillWidth: true
+                                spacing: 10
+
+                                Rectangle {
+                                    Layout.preferredWidth: 12
+                                    Layout.preferredHeight: 12
+                                    radius: 6
+                                    color: root.chatController.connected ? root.theme.success : root.theme.muted
                                 }
+
                                 Label {
                                     Layout.fillWidth: true
-                                    text: model.ip + ":" + model.port
-                                    color: root.theme.subtext
+                                    text: root.chatController.connected ? (root.chineseMode ? "已连接" : "Connected") : (root.chineseMode ? "未连接" : "Disconnected")
+                                    color: root.chatController.connected ? root.theme.success : root.theme.subtext
+                                    font.pixelSize: 16
+                                    font.weight: Font.Medium
+                                }
+
+                                Text {
+                                    text: root.chatController.connected ? "✓" : "!"
+                                    color: root.chatController.connected ? root.theme.success : root.theme.warning
+                                    font.pixelSize: 16
+                                    font.weight: Font.Medium
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Label { text: root.chineseMode ? "频道" : "Channels"; color: root.theme.subtext; font.pixelSize: 12; Layout.fillWidth: true }
+                                Label { text: root.channelModel.count; color: root.theme.text; font.pixelSize: 12; font.weight: Font.Medium }
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Label { text: root.chineseMode ? "消息" : "Messages"; color: root.theme.subtext; font.pixelSize: 12; Layout.fillWidth: true }
+                                Label { text: root.messageModel.count; color: root.theme.text; font.pixelSize: 12; font.weight: Font.Medium }
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Label { text: root.chineseMode ? "当前频道" : "Active channel"; color: root.theme.subtext; font.pixelSize: 12; Layout.fillWidth: true }
+                                Label {
+                                    text: root.currentTopic === "" ? "-" : root.currentTopic
+                                    color: root.theme.text
                                     font.pixelSize: 12
+                                    font.weight: Font.Medium
                                     elide: Text.ElideRight
                                 }
                             }
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    connectionList.currentIndex = index
-                                    root.selectRuleFd(model.fd)
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 142
+                        radius: 16
+                        color: root.theme.panelAlt
+                        border.color: root.theme.line
+                        border.width: 1
+                        antialiasing: true
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 14
+                            spacing: 10
+
+                            SectionTitle { theme: root.theme; text: root.chineseMode ? "连接规则" : "Connection rules" }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                AppButton {
+                                    theme: root.theme
+                                    Layout.fillWidth: true
+                                    text: root.chineseMode ? "刷新" : "Refresh"
+                                    enabled: root.chatController.connected
+                                    onClicked: root.requestConnections()
+                                }
+                                AppButton {
+                                    theme: root.theme
+                                    Layout.preferredWidth: 86
+                                    text: root.chineseMode ? "订阅者" : "Subs"
+                                    fill: "transparent"
+                                    foreground: root.theme.accent
+                                    enabled: root.chatController.connected && ruleTopicInput.text.trim().length > 0
+                                    onClicked: root.requestSubscribers(ruleTopicInput.text.trim())
+                                }
+                            }
+
+                            Field {
+                                id: ruleTopicInput
+                                theme: root.theme
+                                Layout.fillWidth: true
+                                text: root.currentTopic
+                                placeholderText: root.chineseMode ? "规则频道" : "Rule topic"
+                                enabled: root.chatController.connected
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 126
+                        radius: 16
+                        color: root.theme.panelAlt
+                        border.color: root.theme.line
+                        border.width: 1
+                        antialiasing: true
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 14
+                            spacing: 8
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: root.selectedRuleFd > 0 ? ((root.chineseMode ? "目标 fd " : "Target fd ") + root.selectedRuleFd) : (root.chineseMode ? "请在下方选择 fd" : "Select an fd below")
+                                color: root.selectedRuleFd > 0 ? root.theme.text : root.theme.subtext
+                                font.pixelSize: 12
+                                font.weight: Font.Medium
+                                elide: Text.ElideRight
+                            }
+
+                            ListView {
+                                id: connectionList
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                model: root.connectionModel
+                                clip: true
+                                spacing: 6
+                                reuseItems: true
+                                delegate: Rectangle {
+                                    width: connectionList.width
+                                    height: 38
+                                    radius: 14
+                                    color: model.fd === root.selectedRuleFd ? root.theme.accentSoft : root.theme.elevated
+                                    border.color: model.fd === root.selectedRuleFd ? root.theme.accent : root.theme.line
+                                    border.width: 1
+                                    antialiasing: true
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 10
+                                        anchors.rightMargin: 10
+                                        Label {
+                                            Layout.preferredWidth: 58
+                                            text: "fd " + model.fd
+                                            color: root.theme.text
+                                            font.pixelSize: 12
+                                            font.weight: Font.Medium
+                                        }
+                                        Label {
+                                            Layout.fillWidth: true
+                                            text: model.ip + ":" + model.port
+                                            color: root.theme.subtext
+                                            font.pixelSize: 12
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            connectionList.currentIndex = index
+                                            root.selectRuleFd(model.fd)
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
 
-                    GridLayout {
+                    Rectangle {
                         Layout.fillWidth: true
-                        columns: 1
-                        rowSpacing: 8
-                        StyledCheckBox {
-                            id: denySubCheck
-                            theme: root.theme
-                            Layout.fillWidth: true
-                            text: root.chineseMode ? "禁止订阅" : "Deny sub"
-                            description: root.chineseMode ? "阻止该 fd 订阅选中的频道。" : "Blocks this fd from subscribing to the selected topic."
-                            enabled: root.chatController.connected
-                        }
-                        StyledCheckBox {
-                            id: denyRecvCheck
-                            theme: root.theme
-                            Layout.fillWidth: true
-                            text: root.chineseMode ? "禁止接收" : "Deny recv"
-                            description: root.chineseMode ? "阻止服务端向该 fd 投递此频道消息。" : "Keeps server deliveries from reaching this fd on this topic."
-                            enabled: root.chatController.connected
-                        }
-                        StyledCheckBox {
-                            id: denyPubCheck
-                            theme: root.theme
-                            Layout.fillWidth: true
-                            text: root.chineseMode ? "禁止发布" : "Deny publish"
-                            description: root.chineseMode ? "拒绝该 fd 向此频道发布消息。" : "Rejects publish attempts from this fd for this topic."
-                            enabled: root.chatController.connected
-                        }
-                    }
+                        Layout.preferredHeight: 268
+                        radius: 16
+                        color: root.theme.panelAlt
+                        border.color: root.theme.line
+                        border.width: 1
+                        antialiasing: true
 
-                    GridLayout {
-                        Layout.fillWidth: true
-                        columns: 2
-                        rowSpacing: 8
-                        columnSpacing: 8
-                        AppButton {
-                            theme: root.theme
-                            Layout.fillWidth: true
-                            text: root.chineseMode ? "添加规则" : "Add Rule"
-                            enabled: root.chatController.connected
-                            fill: root.theme.success
-                            hoverFill: root.theme.successHover
-                            onClicked: {
-                                const topic = root.selectedRuleTopic()
-                                const mask = root.currentRuleMask()
-                                if (topic.length === 0) {
-                                    root.noticeRequested(root.chineseMode ? "规则频道不能为空" : "Rule topic cannot be empty")
-                                } else if (root.selectedRuleFd <= 0) {
-                                    root.noticeRequested(root.chineseMode ? "请选择一个在线连接" : "Select an online connection")
-                                } else if (mask === 0) {
-                                    root.noticeRequested(root.chineseMode ? "请至少选择一条规则" : "Select at least one rule")
-                                } else {
-                                    root.addRule(topic, mask)
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 14
+                            spacing: 10
+
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: 1
+                                rowSpacing: 8
+                                StyledCheckBox {
+                                    id: denySubCheck
+                                    theme: root.theme
+                                    Layout.fillWidth: true
+                                    text: root.chineseMode ? "禁止订阅" : "Deny sub"
+                                    description: root.chineseMode ? "阻止该 fd 订阅选中的频道。" : "Blocks this fd from subscribing to the selected topic."
+                                    enabled: root.chatController.connected
+                                }
+                                StyledCheckBox {
+                                    id: denyRecvCheck
+                                    theme: root.theme
+                                    Layout.fillWidth: true
+                                    text: root.chineseMode ? "禁止接收" : "Deny recv"
+                                    description: root.chineseMode ? "阻止服务端向该 fd 投递此频道消息。" : "Keeps server deliveries from reaching this fd on this topic."
+                                    enabled: root.chatController.connected
+                                }
+                                StyledCheckBox {
+                                    id: denyPubCheck
+                                    theme: root.theme
+                                    Layout.fillWidth: true
+                                    text: root.chineseMode ? "禁止发布" : "Deny publish"
+                                    description: root.chineseMode ? "拒绝该 fd 向此频道发布消息。" : "Rejects publish attempts from this fd for this topic."
+                                    enabled: root.chatController.connected
                                 }
                             }
-                        }
-                        AppButton {
-                            theme: root.theme
-                            Layout.fillWidth: true
-                            text: root.chineseMode ? "移除" : "Remove"
-                            enabled: root.chatController.connected
-                            fill: "transparent"
-                            foreground: root.theme.danger
-                            onClicked: {
-                                const topic = root.selectedRuleTopic()
-                                const mask = root.currentRuleMask()
-                                if (topic.length === 0) {
-                                    root.noticeRequested(root.chineseMode ? "规则频道不能为空" : "Rule topic cannot be empty")
-                                } else if (root.selectedRuleFd <= 0) {
-                                    root.noticeRequested(root.chineseMode ? "请选择一个在线连接" : "Select an online connection")
-                                } else if (mask === 0) {
-                                    root.noticeRequested(root.chineseMode ? "请至少选择一条规则" : "Select at least one rule")
-                                } else {
-                                    root.removeRule(topic, mask)
+
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: 2
+                                rowSpacing: 8
+                                columnSpacing: 8
+
+                                AppButton {
+                                    theme: root.theme
+                                    Layout.fillWidth: true
+                                    text: root.chineseMode ? "添加规则" : "Add Rule"
+                                    enabled: root.chatController.connected
+                                    fill: root.theme.success
+                                    hoverFill: root.theme.successHover
+                                    onClicked: {
+                                        const topic = root.selectedRuleTopic()
+                                        const mask = root.currentRuleMask()
+                                        if (topic.length === 0) {
+                                            root.noticeRequested(root.chineseMode ? "规则频道不能为空" : "Rule topic cannot be empty")
+                                        } else if (root.selectedRuleFd <= 0) {
+                                            root.noticeRequested(root.chineseMode ? "请选择一个在线连接" : "Select an online connection")
+                                        } else if (mask === 0) {
+                                            root.noticeRequested(root.chineseMode ? "请至少选择一条规则" : "Select at least one rule")
+                                        } else {
+                                            root.addRule(topic, mask)
+                                        }
+                                    }
+                                }
+
+                                AppButton {
+                                    theme: root.theme
+                                    Layout.fillWidth: true
+                                    text: root.chineseMode ? "移除" : "Remove"
+                                    enabled: root.chatController.connected
+                                    fill: root.theme.danger
+                                    hoverFill: root.theme.dangerHover
+                                    foreground: root.theme.accentText
+                                    onClicked: {
+                                        const topic = root.selectedRuleTopic()
+                                        const mask = root.currentRuleMask()
+                                        if (topic.length === 0) {
+                                            root.noticeRequested(root.chineseMode ? "规则频道不能为空" : "Rule topic cannot be empty")
+                                        } else if (root.selectedRuleFd <= 0) {
+                                            root.noticeRequested(root.chineseMode ? "请选择一个在线连接" : "Select an online connection")
+                                        } else if (mask === 0) {
+                                            root.noticeRequested(root.chineseMode ? "请至少选择一条规则" : "Select at least one rule")
+                                        } else {
+                                            root.removeRule(topic, mask)
+                                        }
+                                    }
+                                }
+
+                                AppButton {
+                                    theme: root.theme
+                                    Layout.columnSpan: 2
+                                    Layout.fillWidth: true
+                                    text: root.chineseMode ? "检查关系" : "Check Relation"
+                                    enabled: root.chatController.connected && root.selectedRuleFd > 0 && ruleTopicInput.text.trim().length > 0
+                                    fill: "transparent"
+                                    foreground: root.theme.accent
+                                    onClicked: root.checkRelation(ruleTopicInput.text.trim())
                                 }
                             }
-                        }
-                        AppButton {
-                            theme: root.theme
-                            Layout.columnSpan: 2
-                            Layout.fillWidth: true
-                            text: root.chineseMode ? "检查关系" : "Check Relation"
-                            enabled: root.chatController.connected && root.selectedRuleFd > 0 && ruleTopicInput.text.trim().length > 0
-                            fill: "transparent"
-                            foreground: root.theme.accent
-                            onClicked: root.checkRelation(ruleTopicInput.text.trim())
-                        }
-                    }
 
-                    Label {
-                        Layout.fillWidth: true
-                        text: root.relationStatusText
-                        color: root.relationMask === 0 ? root.theme.subtext : root.theme.text
-                        font.pixelSize: 12
-                        wrapMode: Text.WordWrap
+                            Label {
+                                Layout.fillWidth: true
+                                text: root.relationStatusText
+                                color: root.relationMask === 0 ? root.theme.subtext : root.theme.text
+                                font.pixelSize: 12
+                                wrapMode: Text.WordWrap
+                            }
+                        }
                     }
 
                     SectionTitle { theme: root.theme; text: root.chineseMode ? "频道订阅者" : "Topic subscribers" }
@@ -335,35 +434,25 @@ Rectangle {
                     ListView {
                         id: subscriberList
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 96
+                        Layout.preferredHeight: 104
                         model: root.subscriberModel
                         clip: true
                         spacing: 6
                         reuseItems: true
                         delegate: Rectangle {
                             width: subscriberList.width
-                            height: 34
-                            radius: 8
+                            height: 36
+                            radius: 14
                             color: model.fd === root.selectedRuleFd ? root.theme.accentSoft : root.theme.elevated
                             border.color: model.fd === root.selectedRuleFd ? root.theme.accent : root.theme.line
+                            border.width: 1
+                            antialiasing: true
                             RowLayout {
                                 anchors.fill: parent
                                 anchors.leftMargin: 10
                                 anchors.rightMargin: 10
-                                Label {
-                                    Layout.preferredWidth: 58
-                                    text: "fd " + model.fd
-                                    color: root.theme.text
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
-                                }
-                                Label {
-                                    Layout.fillWidth: true
-                                    text: model.ip + ":" + model.port
-                                    color: root.theme.subtext
-                                    font.pixelSize: 12
-                                    elide: Text.ElideRight
-                                }
+                                Label { Layout.preferredWidth: 58; text: "fd " + model.fd; color: root.theme.text; font.pixelSize: 12; font.weight: Font.Medium }
+                                Label { Layout.fillWidth: true; text: model.ip + ":" + model.port; color: root.theme.subtext; font.pixelSize: 12; elide: Text.ElideRight }
                             }
                             MouseArea {
                                 anchors.fill: parent
@@ -404,33 +493,33 @@ Rectangle {
                     Layout.fillHeight: true
                     model: root.serverTopicModel
                     clip: true
-                    spacing: 7
+                    spacing: 8
                     reuseItems: true
                     opacity: root.serverTopicLoading ? 0.58 : 1
+
                     Behavior on opacity {
                         NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
                     }
+
                     delegate: Rectangle {
                         width: serverTopicList.width
-                        height: 48
-                        radius: 8
-                        color: serverTopicHover.hovered ? root.theme.accentSoft : root.theme.elevated
+                        height: 54
+                        radius: 16
+                        color: serverTopicHover.hovered ? root.theme.accentSoft : root.theme.panelAlt
                         border.color: serverTopicHover.hovered ? root.theme.accent : root.theme.line
-                        Behavior on color {
-                            ColorAnimation { duration: 180; easing.type: Easing.OutCubic }
-                        }
-                        Behavior on border.color {
-                            ColorAnimation { duration: 180; easing.type: Easing.OutCubic }
-                        }
+                        border.width: 1
+                        antialiasing: true
+
                         RowLayout {
                             anchors.fill: parent
-                            anchors.leftMargin: 10
+                            anchors.leftMargin: 12
                             anchors.rightMargin: 10
                             Label {
                                 Layout.fillWidth: true
                                 text: model.topic
                                 color: root.theme.text
                                 font.pixelSize: 13
+                                font.weight: Font.Medium
                                 elide: Text.ElideRight
                             }
                             Label {
@@ -441,10 +530,10 @@ Rectangle {
                             AppButton {
                                 theme: root.theme
                                 visible: serverTopicHover.hovered
-                                Layout.preferredWidth: 64
+                                Layout.preferredWidth: 80
                                 implicitHeight: 30
                                 text: root.isJoinedTopic(model.topic) ? (root.chineseMode ? "退出" : "Leave") : (root.chineseMode ? "加入" : "Join")
-                                font.pixelSize: 12
+                                font.pixelSize: 11
                                 fill: root.isJoinedTopic(model.topic) ? "transparent" : root.theme.accent
                                 foreground: root.isJoinedTopic(model.topic) ? root.theme.danger : root.theme.accentText
                                 enabled: root.chatController.connected
@@ -474,23 +563,25 @@ Rectangle {
                     Layout.fillHeight: true
                     model: root.localLogModel
                     clip: true
-                    spacing: 6
+                    spacing: 8
                     reuseItems: true
                     delegate: Rectangle {
                         width: localLogView.width
-                        height: 58
-                        radius: 8
-                        color: root.theme.elevated
+                        height: 60
+                        radius: 16
+                        color: root.theme.panelAlt
                         border.color: root.theme.line
+                        border.width: 1
+                        antialiasing: true
                         ColumnLayout {
                             anchors.fill: parent
-                            anchors.margins: 8
+                            anchors.margins: 10
                             spacing: 2
                             Label {
                                 text: model.time + "  " + model.level
                                 color: model.level === "ERROR" ? root.theme.danger : (model.level === "WARN" ? root.theme.warning : root.theme.subtext)
                                 font.pixelSize: 11
-                                font.weight: Font.DemiBold
+                                font.weight: Font.Medium
                             }
                             Label {
                                 Layout.fillWidth: true

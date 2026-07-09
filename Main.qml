@@ -7,9 +7,9 @@ import "qml/panels"
 
 ApplicationWindow {
     id: appWindow
-    width: 1360
-    height: 860
-    minimumWidth: 1120
+    width: 1280
+    height: 800
+    minimumWidth: 1200
     minimumHeight: 700
     visible: true
     title: "ChatHub"
@@ -86,48 +86,51 @@ ApplicationWindow {
 
     QtObject {
         id: appTheme
-        readonly property color window: appWindow.mixThemeColor("#f1f5f9", "#101113")
-        readonly property color surface: appWindow.mixThemeColor("#ffffff", "#1c1d20")
-        readonly property color surfaceAlt: appWindow.mixThemeColor("#f6f8fb", "#25272c")
-        readonly property color elevated: appWindow.mixThemeColor("#f8fafc", "#2b2e34")
-        readonly property color raised: appWindow.mixThemeColor("#ffffff", "#f7f9fc")
-        readonly property color line: appWindow.mixThemeColor("#dce3ec", "#343942")
-        readonly property color text: appWindow.mixThemeColor("#17202a", "#ffffff")
-        readonly property color fieldText: "#17202a"
-        readonly property color subtext: appWindow.mixThemeColor("#4b5563", "#dfe6ee")
-        readonly property color muted: appWindow.mixThemeColor("#7a8696", "#9fabb9")
-        readonly property color accent: "#0a84ff"
-        readonly property color accentHover: appWindow.mixThemeColor("#006edb", "#2997ff")
-        readonly property color accentSoft: appWindow.mixThemeColor("#dbeafe", "#123b67")
-        readonly property color success: appWindow.mixThemeColor("#168a4a", "#30d158")
-        readonly property color successHover: appWindow.mixThemeColor("#0f6b3b", "#0b7f59")
-        readonly property color warning: appWindow.mixThemeColor("#b76b00", "#ff9f0a")
-        readonly property color danger: appWindow.mixThemeColor("#d92d20", "#ff453a")
-        readonly property color dangerHover: appWindow.mixThemeColor("#b42318", "#ff6961")
-        readonly property color fieldBg: appWindow.mixThemeColor("#ffffff", "#f7f9fc")
-        readonly property color fieldBorder: appWindow.mixThemeColor("#bcc8d6", "#c8d1dc")
-        readonly property color fieldDisabledBg: appWindow.mixThemeColor("#e5eaf1", "#d9dee6")
-        readonly property color comboBg: appWindow.mixThemeColor("#ffffff", "#173e67")
-        readonly property color comboHoverBg: appWindow.mixThemeColor("#f4f8ff", "#1f4f80")
-        readonly property color comboPopupBg: appWindow.mixThemeColor("#ffffff", "#242a31")
-        readonly property color comboText: appWindow.mixThemeColor("#17202a", "#f7fbff")
-        readonly property color placeholder: appWindow.mixThemeColor("#6b7280", "#8b95a3")
-        readonly property color buttonGlassBg: appWindow.mixThemeColor("#f8fafc", "#242a31")
-        readonly property color buttonGlassHover: appWindow.mixThemeColor("#e9f2ff", "#303842")
-        readonly property color buttonDisabledBg: appWindow.mixThemeColor("#e5eaf1", "#2a3038")
-        readonly property color buttonDisabledText: appWindow.mixThemeColor("#7a8696", "#9aa4b2")
-        readonly property color glassBorder: appWindow.mixThemeColor("#cbd5e1", "#536070")
-        readonly property color checkboxBg: appWindow.mixThemeColor("#ffffff", "#20262d")
-        readonly property color tabHover: appWindow.mixThemeColor("#eef4fb", "#303842")
-        readonly property color tabBorder: appWindow.mixThemeColor("#cbd5e1", "#3a424d")
-        readonly property color comboIndicator: appWindow.mixThemeColor("#5b6573", "#4b5563")
-        readonly property color popupHighlight: appWindow.mixThemeColor("#dbeafe", "#123b67")
+        readonly property color window: appWindow.mixThemeColor("#f8fafc", "#050b12")
+        readonly property color surface: appWindow.mixThemeColor("#ffffff", "#0d1622")
+        readonly property color surfaceAlt: appWindow.mixThemeColor("#f8fafc", "#111c2a")
+        readonly property color elevated: appWindow.mixThemeColor("#ffffff", "#172231")
+        readonly property color raised: appWindow.mixThemeColor("#fbfdff", "#1d2938")
+        readonly property color line: appWindow.mixThemeColor("#dfe6ef", "#263546")
+        readonly property color text: appWindow.mixThemeColor("#111827", "#f8fafc")
+        readonly property color fieldText: appWindow.mixThemeColor("#111827", "#f8fafc")
+        readonly property color subtext: appWindow.mixThemeColor("#4b5563", "#b9c3d0")
+        readonly property color muted: appWindow.mixThemeColor("#7b8796", "#8f9bad")
+        readonly property color accent: "#2563eb"
+        readonly property color accentHover: appWindow.mixThemeColor("#1d4ed8", "#3b82f6")
+        readonly property color accentSoft: appWindow.mixThemeColor("#dbeafe", "#123b7a")
+        readonly property color success: appWindow.mixThemeColor("#16a34a", "#38d878")
+        readonly property color successHover: appWindow.mixThemeColor("#15803d", "#22c55e")
+        readonly property color warning: appWindow.mixThemeColor("#b7791f", "#f59e0b")
+        readonly property color danger: appWindow.mixThemeColor("#dc4c4f", "#d85b60")
+        readonly property color dangerHover: appWindow.mixThemeColor("#c93337", "#ef6b70")
+        readonly property color fieldBg: appWindow.mixThemeColor("#fbfcff", "#111b28")
+        readonly property color fieldBorder: appWindow.mixThemeColor("#dfe5ee", "#344458")
+        readonly property color fieldDisabledBg: appWindow.mixThemeColor("#edf1f7", "#182536")
+        readonly property color comboBg: appWindow.mixThemeColor("#ffffff", "#121d2b")
+        readonly property color comboHoverBg: appWindow.mixThemeColor("#f4f8ff", "#1a2a3d")
+        readonly property color comboPopupBg: appWindow.mixThemeColor("#ffffff", "#162233")
+        readonly property color comboText: appWindow.mixThemeColor("#111827", "#f8fafc")
+        readonly property color placeholder: appWindow.mixThemeColor("#8b95a3", "#7d8ba0")
+        readonly property color buttonGlassBg: appWindow.mixThemeColor("#ffffff", "#121d2b")
+        readonly property color buttonGlassHover: appWindow.mixThemeColor("#eef5ff", "#1b2a3d")
+        readonly property color buttonDisabledBg: appWindow.mixThemeColor("#f2f5f9", "#1b2737")
+        readonly property color buttonDisabledText: appWindow.mixThemeColor("#8b95a3", "#748297")
+        readonly property color glassBorder: appWindow.mixThemeColor("#e0e6ef", "#304156")
+        readonly property color checkboxBg: appWindow.mixThemeColor("#ffffff", "#111b28")
+        readonly property color tabHover: appWindow.mixThemeColor("#edf4ff", "#1a2a3d")
+        readonly property color tabBorder: appWindow.mixThemeColor("#dbe2ec", "#304156")
+        readonly property color comboIndicator: appWindow.mixThemeColor("#667085", "#a8b3c4")
+        readonly property color popupHighlight: appWindow.mixThemeColor("#dbeafe", "#173f7c")
         readonly property color ownMeta: appWindow.mixThemeColor("#dcecff", "#d9ebff")
-        readonly property color toastBg: appWindow.mixThemeColor("#17202a", "#f7f9fc")
-        readonly property color toastBorder: appWindow.mixThemeColor("#2d3a49", "#cbd5e1")
-        readonly property color toastText: appWindow.mixThemeColor("#ffffff", "#17202a")
+        readonly property color toastBg: appWindow.mixThemeColor("#111827", "#f8fafc")
+        readonly property color toastBorder: appWindow.mixThemeColor("#263242", "#dce3ed")
+        readonly property color toastText: appWindow.mixThemeColor("#ffffff", "#111827")
         readonly property color accentText: "#ffffff"
         readonly property color switchThumbBorder: appWindow.mixThemeColor("#d6dde6", "#d9ebff")
+        readonly property color shell: appWindow.mixThemeColor("#ffffff", "#08111d")
+        readonly property color panel: appWindow.mixThemeColor("#ffffff", "#0d1724")
+        readonly property color panelAlt: appWindow.mixThemeColor("#fbfcfe", "#121e2c")
     }
 
     ListModel { id: channelListModel }
@@ -397,6 +400,7 @@ ApplicationWindow {
 
     ColumnLayout {
         anchors.fill: parent
+        anchors.margins: 10
         spacing: 0
 
         TopBar {
@@ -406,7 +410,7 @@ ApplicationWindow {
             darkMode: appWindow.darkMode
             chineseMode: appWindow.chineseMode
             Layout.fillWidth: true
-            Layout.preferredHeight: 66
+            Layout.preferredHeight: 64
             onConnectRequested: (host, port, nickname) => appController.connectToServer(host, port, nickname)
             onDisconnectRequested: appController.disconnectFromServer()
             onThemeRequested: dark => appWindow.darkMode = dark
@@ -417,6 +421,19 @@ ApplicationWindow {
             Layout.fillWidth: true
             Layout.fillHeight: true
             orientation: Qt.Horizontal
+            handle: Rectangle {
+                implicitWidth: 10
+                implicitHeight: 1
+                color: appTheme.window
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: 1
+                    color: appTheme.line
+                }
+            }
 
             ChannelsPanel {
                 theme: appTheme
@@ -424,9 +441,9 @@ ApplicationWindow {
                 channelModel: channelListModel
                 currentTopic: appWindow.currentTopic
                 chineseMode: appWindow.chineseMode
-                Controls.SplitView.preferredWidth: 286
-                Controls.SplitView.minimumWidth: 220
-                Controls.SplitView.maximumWidth: 420
+                Controls.SplitView.preferredWidth: 282
+                Controls.SplitView.minimumWidth: 250
+                Controls.SplitView.maximumWidth: 360
                 onJoinRequested: topic => joinTopic(topic)
                 onLeaveRequested: topic => appController.unsubscribeTopic(topic)
                 onTopicSelected: topic => currentTopic = topic
@@ -440,10 +457,10 @@ ApplicationWindow {
                 channelModel: channelListModel
                 currentTopic: appWindow.currentTopic
                 messageRevision: appWindow.messageRevision
-                messageCount: countMessages(appWindow.currentTopic)
+                messageCount: appWindow.messageRevision >= 0 ? countMessages(appWindow.currentTopic) : 0
                 chineseMode: appWindow.chineseMode
                 Controls.SplitView.fillWidth: true
-                Controls.SplitView.minimumWidth: 420
+                Controls.SplitView.minimumWidth: 460
                 onSendRequested: (text, reliable, retain) => {
                     if (appController.publishMessageAdvanced(currentTopic, text, reliable, retain)) {
                         chatPanel.clearMessage()
@@ -480,9 +497,9 @@ ApplicationWindow {
                 relationStatusText: appWindow.relationStatusText
                 relationMask: appWindow.relationMask
                 chineseMode: appWindow.chineseMode
-                Controls.SplitView.preferredWidth: 350
-                Controls.SplitView.minimumWidth: 300
-                Controls.SplitView.maximumWidth: 520
+                Controls.SplitView.preferredWidth: 300
+                Controls.SplitView.minimumWidth: 286
+                Controls.SplitView.maximumWidth: 420
                 onRequestTopics: offset => requestTopics(offset)
                 onRequestLogs: offset => requestLogs(offset)
                 onRequestConnections: appController.requestConnectionList()
@@ -530,7 +547,8 @@ ApplicationWindow {
             text: noticeText
             color: appTheme.toastText
             font.pixelSize: 14
-            font.weight: Font.DemiBold
+            font.weight: Font.Medium
+            renderType: Text.CurveRendering
             elide: Text.ElideRight
         }
     }
