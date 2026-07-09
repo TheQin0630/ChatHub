@@ -33,12 +33,8 @@ qt_add_resources(ChatHub "app_icons"
     PREFIX "/icons"
     BASE "resources"
     FILES
-        resources/chathub_icon.svg
-        resources/chathub_icon.png
-        resources/chathub_icon.ico
         resources/my_icon_light.ico
         resources/my_icon_light_ui.png
-        resources/my_icon_dark_ui.png
 )
 
 qt_add_qml_module(ChatHub
