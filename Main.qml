@@ -172,6 +172,18 @@ ApplicationWindow {
         return count
     }
 
+    function removeMessages(topic) {
+        for (let i = messageListModel.count - 1; i >= 0; --i) {
+            if (messageListModel.get(i).topic === topic) messageListModel.remove(i)
+        }
+        messageRevision++
+    }
+
+    function selectTopic(topic) {
+        const index = topicIndex(topic)
+        currentTopic = index >= 0 ? channelListModel.get(index).topic : ""
+    }
+
     function addLocalLog(time, level, message) {
         localLogListModel.append({ time: time, level: level, message: clippedText(message, 160) })
         while (localLogListModel.count > 80) localLogListModel.remove(0)
@@ -209,6 +221,16 @@ ApplicationWindow {
         for (let i = 0; i < messageListModel.count; ++i) {
             if (messageListModel.get(i).clientMessageId === clientMessageId) {
                 messageListModel.setProperty(i, "state", "sent")
+                messageRevision++
+                return
+            }
+        }
+    }
+
+    function failOutgoing(clientMessageId) {
+        for (let i = 0; i < messageListModel.count; ++i) {
+            if (messageListModel.get(i).clientMessageId === clientMessageId) {
+                messageListModel.setProperty(i, "state", "failed")
                 messageRevision++
                 return
             }
@@ -291,7 +313,11 @@ ApplicationWindow {
         function onChannelRemoved(topic) {
             const index = topicIndex(topic)
             if (index >= 0) channelListModel.remove(index)
-            if (currentTopic === topic) currentTopic = channelListModel.count > 0 ? channelListModel.get(0).topic : ""
+            removeMessages(topic)
+            if (currentTopic === topic) {
+                const nextIndex = Math.min(index, channelListModel.count - 1)
+                selectTopic(nextIndex >= 0 ? channelListModel.get(nextIndex).topic : "")
+            }
         }
 
         function onOutgoingMessageQueued(topic, user, message, time, clientMessageId) {
@@ -300,6 +326,11 @@ ApplicationWindow {
 
         function onOutgoingMessageConfirmed(clientMessageId) {
             confirmOutgoing(clientMessageId)
+        }
+
+        function onOutgoingMessageFailed(clientMessageId, reason) {
+            failOutgoing(clientMessageId)
+            showNotice(reason)
         }
 
         function onIncomingMessage(topic, user, message, own, forwarded, sourceTopic, time) {
@@ -446,7 +477,7 @@ ApplicationWindow {
                 Controls.SplitView.maximumWidth: 360
                 onJoinRequested: topic => joinTopic(topic)
                 onLeaveRequested: topic => appController.unsubscribeTopic(topic)
-                onTopicSelected: topic => currentTopic = topic
+                onTopicSelected: topic => selectTopic(topic)
             }
 
             ChatPanel {
@@ -466,7 +497,7 @@ ApplicationWindow {
                         chatPanel.clearMessage()
                     }
                 }
-                onChannelSelected: topic => currentTopic = topic
+                onChannelSelected: topic => selectTopic(topic)
                 onRefreshRequested: {
                     requestTopics(0)
                 }

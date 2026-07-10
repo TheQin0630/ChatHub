@@ -112,3 +112,22 @@ add_test(NAME network_client_tests COMMAND network_client_tests)
 set_tests_properties(network_client_tests PROPERTIES
     ENVIRONMENT "PATH=${CMAKE_PREFIX_PATH}/bin;${MINGW_RUNTIME_DIR};$ENV{PATH}"
 )
+
+qt_add_executable(controller_tests
+    tests/controller_tests.cpp
+    src/controller/ChatController.h
+    src/controller/ChatController.cpp
+    src/network/NetworkClient.h
+    src/network/NetworkClient.cpp
+    src/protocol/ProtocolAdapter.h
+    src/protocol/ProtocolAdapter.cpp
+)
+
+target_link_libraries(controller_tests
+    PRIVATE Qt6::Core Qt6::Network
+)
+
+add_test(NAME controller_tests COMMAND controller_tests)
+set_tests_properties(controller_tests PROPERTIES
+    ENVIRONMENT "PATH=${CMAKE_PREFIX_PATH}/bin;${MINGW_RUNTIME_DIR};$ENV{PATH}"
+)

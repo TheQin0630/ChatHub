@@ -15,6 +15,23 @@ Rectangle {
     signal leaveRequested(string topic)
     signal topicSelected(string topic)
 
+    function syncCurrentIndex() {
+        for (let i = 0; i < root.channelModel.count; ++i) {
+            if (root.channelModel.get(i).topic === root.currentTopic) {
+                channelView.currentIndex = i
+                return
+            }
+        }
+        channelView.currentIndex = -1
+    }
+
+    onCurrentTopicChanged: syncCurrentIndex()
+
+    Connections {
+        target: root.channelModel
+        function onCountChanged() { root.syncCurrentIndex() }
+    }
+
     color: theme.panel
     border.color: theme.line
     border.width: 1
@@ -178,8 +195,17 @@ Rectangle {
                     }
                 }
 
-                HoverHandler { id: channelHover }
-                TapHandler { onTapped: root.topicSelected(model.topic) }
+                HoverHandler {
+                    id: channelHover
+                    cursorShape: Qt.PointingHandCursor
+                }
+                TapHandler {
+                    acceptedButtons: Qt.LeftButton
+                    onTapped: {
+                        channelView.currentIndex = index
+                        root.topicSelected(model.topic)
+                    }
+                }
             }
         }
 

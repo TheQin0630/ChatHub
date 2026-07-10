@@ -17,6 +17,7 @@ class ChatController : public QObject
 
 public:
     explicit ChatController(QObject *parent = nullptr);
+    ~ChatController() override;
 
     bool connected() const;
     bool busy() const;
@@ -51,6 +52,7 @@ signals:
     void publishAck(QString topic);
     void outgoingMessageQueued(QString topic, QString user, QString message, QString time, int clientMessageId);
     void outgoingMessageConfirmed(int clientMessageId);
+    void outgoingMessageFailed(int clientMessageId, QString reason);
     void incomingMessage(QString topic, QString user, QString message, bool own, bool forwarded, QString sourceTopic, QString time);
     void serverLogsReceived(QStringList rows, int total, int offset, bool hasMore);
     void serverTopicsReceived(QVariantList rows, int total, int offset, bool hasMore);
@@ -78,7 +80,10 @@ private:
     void setStatusText(const QString &statusText);
     void appendLog(const QString &level, const QString &message);
     void handleFrame(const ProtocolAdapter::Frame &frame);
-    void confirmPendingByPacket(int packetId, const QString &fallbackTopic);
+    void resetSessionState(const QString &reason);
+    void failAllPendingPublishes(const QString &reason);
+    bool confirmPendingPublish(const ProtocolAdapter::Frame &frame);
+    bool failPendingPublish(const ProtocolAdapter::Frame &frame, const QString &reason);
     int nextPacketId();
     int nextRequestId();
 

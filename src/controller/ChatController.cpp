@@ -15,6 +15,7 @@ ChatController::ChatController(QObject *parent)
     connect(&m_network, &NetworkClient::disconnected, this, [this]() {
         setBusy(false);
         setStatusText(QStringLiteral("Disconnected"));
+        resetSessionState(QStringLiteral("connection closed"));
         appendLog(QStringLiteral("WARN"), QStringLiteral("connection closed"));
         emit connectedChanged();
     });
@@ -29,6 +30,11 @@ ChatController::ChatController(QObject *parent)
         emit userMessage(QStringLiteral("received invalid server frame"));
     });
     connect(&m_network, &NetworkClient::frameReceived, this, &ChatController::handleFrame);
+}
+
+ChatController::~ChatController()
+{
+    disconnect(&m_network, nullptr, this, nullptr);
 }
 
 bool ChatController::connected() const
@@ -355,15 +361,15 @@ void ChatController::handleFrame(const ProtocolAdapter::Frame &frame)
         break;
     case ProtocolAdapter::PublishAck:
         appendLog(QStringLiteral("ACK"), QStringLiteral("puback %1").arg(frame.topic));
-        emit publishAck(frame.topic);
-        if (!m_pendingPublishes.isEmpty()) {
-            PendingPublish item = m_pendingPublishes.dequeue();
-            emit outgoingMessageConfirmed(item.clientMessageId);
+        if (!confirmPendingPublish(frame)) {
+            appendLog(QStringLiteral("WARN"), QStringLiteral("puback had no matching pending publish: %1").arg(frame.topic));
         }
         break;
     case ProtocolAdapter::PubRec1:
         appendLog(QStringLiteral("ACK"), QStringLiteral("pubrec1 packet=%1").arg(frame.packetId));
-        confirmPendingByPacket(frame.packetId, frame.topic);
+        if (!confirmPendingPublish(frame)) {
+            appendLog(QStringLiteral("WARN"), QStringLiteral("pubrec1 had no matching packet: %1").arg(frame.packetId));
+        }
         break;
     case ProtocolAdapter::Publish:
     case ProtocolAdapter::Deliver: {
@@ -437,6 +443,9 @@ void ChatController::handleFrame(const ProtocolAdapter::Frame &frame)
         break;
     case ProtocolAdapter::PublishReject:
         appendLog(QStringLiteral("ERROR"), QStringLiteral("publish rejected: %1 (code=%2)").arg(frame.rejectReason).arg(frame.rejectCode));
+        if (!failPendingPublish(frame, frame.rejectReason)) {
+            appendLog(QStringLiteral("WARN"), QStringLiteral("publish reject had no matching pending publish: %1").arg(frame.topic));
+        }
         emit userMessage(QStringLiteral("Publish rejected: %1").arg(frame.rejectReason));
         break;
     case ProtocolAdapter::ConnectionListResponse: {
@@ -511,17 +520,61 @@ void ChatController::handleFrame(const ProtocolAdapter::Frame &frame)
     }
 }
 
-void ChatController::confirmPendingByPacket(int packetId, const QString &fallbackTopic)
+void ChatController::resetSessionState(const QString &reason)
+{
+    failAllPendingPublishes(reason);
+    m_pendingSubscribeAfterCreate.clear();
+
+    const QList<QString> topics = m_channels.values();
+    m_channels.clear();
+    for (const QString &topic : topics) {
+        emit channelRemoved(topic);
+    }
+}
+
+void ChatController::failAllPendingPublishes(const QString &reason)
+{
+    while (!m_pendingPublishes.isEmpty()) {
+        const PendingPublish item = m_pendingPublishes.dequeue();
+        emit outgoingMessageFailed(item.clientMessageId, reason);
+    }
+}
+
+bool ChatController::confirmPendingPublish(const ProtocolAdapter::Frame &frame)
 {
     for (int i = 0; i < m_pendingPublishes.size(); ++i) {
-        if (m_pendingPublishes.at(i).packetId == packetId) {
-            const PendingPublish item = m_pendingPublishes.takeAt(i);
-            emit publishAck(item.topic);
-            emit outgoingMessageConfirmed(item.clientMessageId);
-            return;
+        const PendingPublish &candidate = m_pendingPublishes.at(i);
+        const bool packetMatches = frame.packetId > 0 && candidate.packetId == frame.packetId;
+        const bool topicMatches = frame.packetId == 0 && !candidate.extended
+                && !frame.topic.isEmpty() && candidate.topic == frame.topic;
+        if (!packetMatches && !topicMatches) {
+            continue;
         }
+
+        const PendingPublish item = m_pendingPublishes.takeAt(i);
+        emit publishAck(item.topic);
+        emit outgoingMessageConfirmed(item.clientMessageId);
+        return true;
     }
-    emit publishAck(fallbackTopic);
+    return false;
+}
+
+bool ChatController::failPendingPublish(const ProtocolAdapter::Frame &frame, const QString &reason)
+{
+    for (int i = 0; i < m_pendingPublishes.size(); ++i) {
+        const PendingPublish &candidate = m_pendingPublishes.at(i);
+        const bool packetMatches = frame.packetId > 0 && candidate.packetId == frame.packetId;
+        const bool topicMatches = !frame.topic.isEmpty() && candidate.topic == frame.topic;
+        const bool onlyPendingFallback = frame.packetId == 0 && frame.topic.isEmpty() && m_pendingPublishes.size() == 1;
+        if (!packetMatches && !topicMatches && !onlyPendingFallback) {
+            continue;
+        }
+
+        const PendingPublish item = m_pendingPublishes.takeAt(i);
+        emit outgoingMessageFailed(item.clientMessageId, reason);
+        return true;
+    }
+    return false;
 }
 
 int ChatController::nextPacketId()

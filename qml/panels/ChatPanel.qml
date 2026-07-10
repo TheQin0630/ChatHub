@@ -123,7 +123,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            model: root.messageModel
+            model: root.currentTopic === "" ? null : root.messageModel
             spacing: 14
             leftMargin: 24
             rightMargin: 24
@@ -133,8 +133,8 @@ Rectangle {
 
             header: Item {
                 width: messageView.width
-                height: root.currentTopic !== "" && root.messageCount > 0 ? 340 : 0
-                visible: height > 0
+                height: 0
+                visible: false
 
                 Rectangle {
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -348,7 +348,9 @@ Rectangle {
                             }
 
                             Label {
-                                text: model.state === "sending" ? (root.chineseMode ? "发送中" : "Sending") : model.time
+                                text: model.state === "sending"
+                                      ? (root.chineseMode ? "发送中" : "Sending")
+                                      : (model.state === "failed" ? (root.chineseMode ? "发送失败" : "Failed") : model.time)
                                 color: model.own ? root.theme.ownMeta : root.theme.subtext
                                 font.pixelSize: 11
                                 renderType: Text.CurveRendering
