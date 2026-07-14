@@ -438,6 +438,7 @@ ApplicationWindow {
                 appController.requestConnectionList()
                 if (selectedRuleTopic !== "") appController.requestTopicSubscribers(selectedRuleTopic)
                 if (selectedRuleTopic !== "" && selectedRuleFd > 0) appController.requestFdTopicRelation(selectedRuleTopic, selectedRuleFd)
+                if (currentTopic !== "" && ownConnectionFd > 0) appController.requestFdTopicRelation(currentTopic, ownConnectionFd)
             }
         }
 

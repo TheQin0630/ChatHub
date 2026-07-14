@@ -112,8 +112,8 @@ Rectangle {
                     Repeater {
                         model: [
                             { label: root.chineseMode ? "订阅" : "Sub", ok: (root.ownRelationMask & 1) !== 0 },
-                            { label: root.chineseMode ? "接收" : "Recv", ok: (root.ownRelationMask & 4) === 0 },
-                            { label: root.chineseMode ? "发布" : "Pub", ok: (root.ownRelationMask & 8) === 0 }
+                            { label: root.chineseMode ? "接收" : "Recv", ok: (root.ownRelationMask & 1) !== 0 && (root.ownRelationMask & 4) === 0 },
+                            { label: root.chineseMode ? "发布" : "Pub", ok: (root.ownRelationMask & 1) !== 0 && (root.ownRelationMask & 8) === 0 }
                         ]
                         delegate: Row {
                             spacing: 4

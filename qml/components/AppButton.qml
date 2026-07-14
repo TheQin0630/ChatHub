@@ -8,6 +8,7 @@ Button {
     property color hoverFill: theme.accentHover
     property color foreground: theme.accentText
     property bool glass: fill === "transparent"
+    property bool outlined: false
 
     implicitHeight: 36
     leftPadding: 16
@@ -37,8 +38,8 @@ Button {
         color: control.enabled
                ? (control.glass ? (control.hovered ? control.theme.buttonGlassHover : control.theme.buttonGlassBg) : (control.hovered ? control.hoverFill : control.fill))
                : control.theme.buttonDisabledBg
-        border.color: control.glass ? control.theme.glassBorder : "transparent"
-        border.width: control.glass ? 1 : 0
+        border.color: (control.glass || control.outlined) ? control.theme.glassBorder : "transparent"
+        border.width: (control.glass || control.outlined) ? 1 : 0
 
         Behavior on color {
             ColorAnimation { duration: 220; easing.type: Easing.OutCubic }

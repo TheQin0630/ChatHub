@@ -216,7 +216,7 @@ Rectangle {
                                 Field { id: aliasInput; theme: root.theme; Layout.fillWidth: true; text: root.confirmedAlias; placeholderText: root.chineseMode ? "别名（最多 32 UTF-8 字节）" : "Alias (max 32 UTF-8 bytes)"; enabled: root.chatController.connected }
                                 AppButton { theme: root.theme; text: root.chineseMode ? "保存" : "Save"; enabled: root.chatController.connected; onClicked: root.updateAlias(aliasInput.text) }
                             }
-                            AppButton { theme: root.theme; Layout.fillWidth: true; text: root.chineseMode ? "查询服务端确认信息" : "Refresh server-confirmed identity"; fill: "transparent"; foreground: root.theme.accent; enabled: root.chatController.connected; onClicked: root.requestSelfConnection() }
+                            AppButton { theme: root.theme; Layout.fillWidth: true; text: root.chineseMode ? "查询服务端确认信息" : "Refresh server-confirmed identity"; fill: root.theme.surfaceAlt; outlined: true; foreground: root.theme.accent; enabled: root.chatController.connected; onClicked: root.requestSelfConnection() }
                         }
                     }
 
@@ -442,7 +442,8 @@ Rectangle {
                                     Layout.fillWidth: true
                                     text: root.chineseMode ? "检查关系" : "Check Relation"
                                     enabled: root.chatController.connected && root.selectedRuleFd > 0 && ruleTopicInput.text.trim().length > 0
-                                    fill: root.theme.buttonGlassBg
+                                    fill: root.theme.surfaceAlt
+                                    outlined: true
                                     foreground: root.theme.accent
                                     onClicked: root.checkRelation(ruleTopicInput.text.trim())
                                 }
