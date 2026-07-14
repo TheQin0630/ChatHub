@@ -40,7 +40,7 @@ class Mock:
     def client_by_fd(self, fd): return next((c for c in self.clients.values() if c.fd == fd), None)
     def permitted(self, c, topic, bit): return not (self.rules.get((c.fd, topic), 0) & bit)
     def deliver(self, c, topic, data, alias, flags=0, packet=0):
-        if not self.permitted(c, topic, 4): return
+        if not self.permitted(c, topic, 2): return
         raw = alias.encode(); payload = struct.pack("!BHH", flags, packet, len(data)) + data + bytes([len(raw)]) + raw
         c.send(DELIVER, topic, payload)
     def normal(self, c, topic, data, alias):
@@ -58,21 +58,21 @@ class Mock:
             c.send(DELETERESP, topic, bytes([0 if exists else 1]))
         elif kind == SUB:
             if topic not in self.topics: c.send(SUBREJ, topic, b"\x02topic not found")
-            elif not self.permitted(c, topic, 2): c.send(SUBREJ, topic, b"\x01subscription denied")
+            elif not self.permitted(c, topic, 1): c.send(SUBREJ, topic, b"\x01subscription denied")
             else:
                 c.subs.add(topic); c.send(SUBACK, topic)
                 if topic in self.retain:
                     data, alias, flags, pid = self.retain[topic]; self.deliver(c, topic, data, alias, flags, pid)
         elif kind == UNSUB: c.subs.discard(topic)
         elif kind == PUB:
-            if not self.permitted(c, topic, 8): c.send(PUBREJ, topic, b"\x01publish denied")
+            if not self.permitted(c, topic, 4): c.send(PUBREJ, topic, b"\x01publish denied")
             else:
                 for x in self.clients.values():
                     if topic in x.subs: self.normal(x, topic, payload, c.alias)
                 c.send(PUBACK, topic); self.log(f"publish {topic}")
         elif kind == PUBEX and len(payload) >= 5:
             flags, pid, size = struct.unpack("!BHH", payload[:5]); data = payload[5:5+size]
-            if len(data) != size or not self.permitted(c, topic, 8): c.send(PUBREJ, topic, b"\x01publish denied")
+            if len(data) != size or not self.permitted(c, topic, 4): c.send(PUBREJ, topic, b"\x01publish denied")
             else:
                 if flags & 1: self.retain[topic] = (data, c.alias, flags, pid)
                 for x in self.clients.values():
@@ -90,7 +90,10 @@ class Mock:
                 key = (fd, topic); self.rules[key] = (self.rules.get(key, 0) | mask) if op == 1 else (self.rules.get(key, 0) & ~mask)
             c.send(RULERESP, topic, bytes([status, op, mask]) + struct.pack("!I", fd) + bytes([len(target.alias.encode()) if target else 0]) + (target.alias.encode() if target else b""))
         elif kind == RELREQ and len(payload) >= 4:
-            fd = struct.unpack("!I", payload[:4])[0]; target = self.client_by_fd(fd); mask = self.rules.get((fd, topic), 0)
+            fd = struct.unpack("!I", payload[:4])[0]; target = self.client_by_fd(fd); request_mask = self.rules.get((fd, topic), 0); mask = 0
+            if request_mask & 1: mask |= 2
+            if request_mask & 2: mask |= 4
+            if request_mask & 4: mask |= 8
             if target and topic in target.subs: mask |= 1
             c.send(RELRESP, topic, bytes([0 if target else 1]) + struct.pack("!I", fd) + bytes([mask, len(target.alias.encode()) if target else 0]) + (target.alias.encode() if target else b""))
         elif kind == UNSUBFD and len(payload) >= 4:

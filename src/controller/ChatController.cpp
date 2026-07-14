@@ -355,8 +355,14 @@ void ChatController::setConnectionRule(const QString &topic, int fd, int ruleMas
         emit userMessage(QStringLiteral("select at least one rule type"));
         return;
     }
+    // UI/关系查询位：sub=0x02, recv=0x04, pub=0x08。
+    // 服务端规则设置位：sub=0x01, recv=0x02, pub=0x04。
+    unsigned char serverMask = 0;
+    if (ruleMask & 0x02) serverMask |= 0x01;
+    if (ruleMask & 0x04) serverMask |= 0x02;
+    if (ruleMask & 0x08) serverMask |= 0x04;
     const int op = add ? 1 : 2; // RULE_OP_ADD=1, RULE_OP_DEL=2
-    const QByteArray payload = ProtocolAdapter::packRuleSetRequest(op, static_cast<unsigned char>(ruleMask), fd, normalized);
+    const QByteArray payload = ProtocolAdapter::packRuleSetRequest(op, serverMask, fd, normalized);
     if (m_network.sendFrame(ProtocolAdapter::RuleSetRequest, normalized, payload)) {
         appendLog(QStringLiteral("SEND"), QStringLiteral("%1 rule for fd=%2 topic=%3 mask=%4")
                   .arg(add ? "add" : "del").arg(fd).arg(normalized).arg(ruleMask));

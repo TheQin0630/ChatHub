@@ -13,6 +13,7 @@ Rectangle {
     required property int messageRevision
     required property int messageCount
     required property bool chineseMode
+    property int ownRelationMask: 0
     property bool advancedSendOpen: false
 
     signal sendRequested(string text, bool reliable, bool retain)
@@ -106,11 +107,27 @@ Rectangle {
                     }
                 }
 
+                Row {
+                    spacing: 7
+                    Repeater {
+                        model: [
+                            { label: root.chineseMode ? "订阅" : "Sub", ok: (root.ownRelationMask & 1) !== 0 },
+                            { label: root.chineseMode ? "接收" : "Recv", ok: (root.ownRelationMask & 4) === 0 },
+                            { label: root.chineseMode ? "发布" : "Pub", ok: (root.ownRelationMask & 8) === 0 }
+                        ]
+                        delegate: Row {
+                            spacing: 4
+                            Rectangle { width: 7; height: 7; radius: 4; anchors.verticalCenter: parent.verticalCenter; color: modelData.ok ? root.theme.success : root.theme.danger }
+                            Label { text: modelData.label; color: root.theme.subtext; font.pixelSize: 11 }
+                        }
+                    }
+                }
+
                 AppButton {
                     theme: root.theme
                     Layout.preferredWidth: 84
                     text: root.chineseMode ? "刷新" : "Refresh"
-                    fill: "transparent"
+                    fill: root.theme.buttonGlassBg
                     foreground: root.theme.accent
                     enabled: root.chatController.connected
                     onClicked: root.refreshRequested()

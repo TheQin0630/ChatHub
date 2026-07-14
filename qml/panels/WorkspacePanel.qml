@@ -250,7 +250,7 @@ Rectangle {
                                     theme: root.theme
                                     Layout.preferredWidth: 86
                                     text: root.chineseMode ? "订阅者" : "Subs"
-                                    fill: "transparent"
+                                    fill: root.theme.buttonGlassBg
                                     foreground: root.theme.accent
                                     enabled: root.chatController.connected && ruleTopicInput.text.trim().length > 0
                                     onClicked: root.requestSubscribers(ruleTopicInput.text.trim())
@@ -442,7 +442,7 @@ Rectangle {
                                     Layout.fillWidth: true
                                     text: root.chineseMode ? "检查关系" : "Check Relation"
                                     enabled: root.chatController.connected && root.selectedRuleFd > 0 && ruleTopicInput.text.trim().length > 0
-                                    fill: "transparent"
+                                    fill: root.theme.buttonGlassBg
                                     foreground: root.theme.accent
                                     onClicked: root.checkRelation(ruleTopicInput.text.trim())
                                 }

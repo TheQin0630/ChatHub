@@ -33,6 +33,8 @@ ApplicationWindow {
     property int relationMask: 0
     property string ownConnectionText: "Not queried"
     property string confirmedAlias: ""
+    property int ownConnectionFd: 0
+    property int ownRelationMask: 0
     property bool darkMode: false
     property bool chineseMode: false
     property real themeProgress: darkMode ? 1.0 : 0.0
@@ -272,6 +274,7 @@ ApplicationWindow {
             }
         }
         chatPanel.positionAtEnd()
+        if (ownConnectionFd > 0 && currentTopic !== "") appController.requestFdTopicRelation(currentTopic, ownConnectionFd)
     }
 
     Timer {
@@ -377,8 +380,10 @@ ApplicationWindow {
         }
 
         function onSelfConnectionReceived(connection) {
+            ownConnectionFd = connection.fd
             confirmedAlias = connection.alias || ""
             ownConnectionText = "fd " + connection.fd + " · " + connection.ip + ":" + connection.port + " · " + (confirmedAlias === "" ? (chineseMode ? "未设置别名" : "no alias") : confirmedAlias)
+            if (currentTopic !== "") appController.requestFdTopicRelation(currentTopic, ownConnectionFd)
         }
 
         function onAliasConfirmed(alias) {
@@ -403,7 +408,11 @@ ApplicationWindow {
                     alias: connections[i].alias || ""
                 })
             }
-            selectedRuleFd = connectionListModel.count > 0 ? connectionListModel.get(0).fd : 0
+            let stillSelected = false
+            for (let i = 0; i < connectionListModel.count; ++i) {
+                if (connectionListModel.get(i).fd === selectedRuleFd) { stillSelected = true; break }
+            }
+            if (!stillSelected) selectedRuleFd = connectionListModel.count > 0 ? connectionListModel.get(0).fd : 0
         }
 
         function onTopicSubscribersReceived(topic, subscribers) {
@@ -417,7 +426,7 @@ ApplicationWindow {
                     alias: subscribers[i].alias || ""
                 })
             }
-            if (subscriberListModel.count > 0) selectedRuleFd = subscriberListModel.get(0).fd
+            // 刷新订阅者列表不应覆盖操作者当前正在管理的 fd。
         }
 
         function onTopicSubscribersStateReceived(topic, status) {
@@ -433,16 +442,26 @@ ApplicationWindow {
         }
 
         function onFdTopicRelationReceived(topic, fd, status, mask) {
-            relationMask = mask
-            if (status === 0) {
+            const isCurrentSelection = topic === selectedRuleTopic && fd === selectedRuleFd
+            if (isCurrentSelection) relationMask = mask
+            if (fd === ownConnectionFd && topic === currentTopic) ownRelationMask = status === 0 ? mask : 0
+            if (status === 0 && isCurrentSelection) {
                 const parts = []
                 if ((mask & 1) !== 0) parts.push("subscribed")
                 if ((mask & 2) !== 0) parts.push("deny sub")
                 if ((mask & 4) !== 0) parts.push("deny recv")
                 if ((mask & 8) !== 0) parts.push("deny publish")
                 relationStatusText = "fd " + fd + " / " + topic + ": " + parts.join(", ")
-            } else {
+            } else if (isCurrentSelection) {
                 relationStatusText = chineseMode ? ("fd " + fd + " / " + topic + ": 无显式关系") : ("fd " + fd + " / " + topic + ": no explicit relation")
+            }
+            for (let i = 0; i < connectionListModel.count; ++i) {
+                if (connectionListModel.get(i).fd === fd) {
+                    connectionListModel.setProperty(i, "subscribed", status === 0 && (mask & 1) !== 0)
+                    connectionListModel.setProperty(i, "denyRecv", status === 0 && (mask & 4) !== 0)
+                    connectionListModel.setProperty(i, "denyPublish", status === 0 && (mask & 8) !== 0)
+                    break
+                }
             }
         }
 
@@ -512,6 +531,7 @@ ApplicationWindow {
                 messageRevision: appWindow.messageRevision
                 messageCount: appWindow.messageRevision >= 0 ? countMessages(appWindow.currentTopic) : 0
                 chineseMode: appWindow.chineseMode
+                ownRelationMask: appWindow.ownRelationMask
                 Controls.SplitView.fillWidth: true
                 Controls.SplitView.minimumWidth: 460
                 onSendRequested: (text, reliable, retain) => {
