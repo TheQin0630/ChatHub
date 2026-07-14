@@ -2,6 +2,13 @@
 
 ChatHub 是一个基于 Qt 6 / QML 的桌面聊天室客户端，用 topic 发布/订阅模型包装聊天室频道。客户端通过 TCP 连接课程联调服务器，支持订阅频道、退订频道、发送消息、接收消息、查看服务端频道列表、查看本地日志、设置连接级规则，并提供中英文切换、深浅主题切换和 Windows 可执行包部署。
 
+## 最新发布
+
+当前版本：[ChatHub v0.1.0](https://github.com/TheQin0630/ChatHub/releases/tag/v0.1.0)
+
+- Windows x64 运行包：[ChatHub-win64.zip](https://github.com/TheQin0630/ChatHub/releases/download/v0.1.0/ChatHub-win64.zip)
+- 包含别名、连接管理、完整本地 mock 与联调测试。
+
 ## 功能概览
 
 - 顶部连接栏：服务器 IP、端口、昵称、连接/断开、当前用户、语言切换、深浅主题切换。
