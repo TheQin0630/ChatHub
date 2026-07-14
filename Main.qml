@@ -31,6 +31,8 @@ ApplicationWindow {
     property string selectedRuleTopic: ""
     property string relationStatusText: "No relation query yet"
     property int relationMask: 0
+    property string ownConnectionText: "Not queried"
+    property string confirmedAlias: ""
     property bool darkMode: false
     property bool chineseMode: false
     property real themeProgress: darkMode ? 1.0 : 0.0
@@ -370,7 +372,25 @@ ApplicationWindow {
         function onConnectedChanged() {
             if (appController.connected) {
                 requestTopics(0)
+                appController.requestSelfConnection()
             }
+        }
+
+        function onSelfConnectionReceived(connection) {
+            confirmedAlias = connection.alias || ""
+            ownConnectionText = "fd " + connection.fd + " · " + connection.ip + ":" + connection.port + " · " + (confirmedAlias === "" ? (chineseMode ? "未设置别名" : "no alias") : confirmedAlias)
+        }
+
+        function onAliasConfirmed(alias) {
+            confirmedAlias = alias
+            appController.requestSelfConnection()
+            showNotice(chineseMode ? "别名已由服务端确认" : "Alias confirmed by server")
+        }
+
+        function onConnectionUnsubscribed(topic, fd, alias) {
+            showNotice((chineseMode ? "已强制取消订阅：" : "Subscription removed: ") + (alias || ("fd " + fd)) + " / " + topic)
+            appController.requestConnectionList()
+            appController.requestTopicSubscribers(topic)
         }
 
         function onServerConnectionsReceived(connections) {
@@ -379,7 +399,8 @@ ApplicationWindow {
                 connectionListModel.append({
                     fd: connections[i].fd,
                     ip: connections[i].ip,
-                    port: connections[i].port
+                    port: connections[i].port,
+                    alias: connections[i].alias || ""
                 })
             }
             selectedRuleFd = connectionListModel.count > 0 ? connectionListModel.get(0).fd : 0
@@ -392,7 +413,8 @@ ApplicationWindow {
                 subscriberListModel.append({
                     fd: subscribers[i].fd,
                     ip: subscribers[i].ip,
-                    port: subscribers[i].port
+                    port: subscribers[i].port,
+                    alias: subscribers[i].alias || ""
                 })
             }
             if (subscriberListModel.count > 0) selectedRuleFd = subscriberListModel.get(0).fd
@@ -527,6 +549,8 @@ ApplicationWindow {
                 selectedRuleFd: appWindow.selectedRuleFd
                 relationStatusText: appWindow.relationStatusText
                 relationMask: appWindow.relationMask
+                ownConnectionText: appWindow.ownConnectionText
+                confirmedAlias: appWindow.confirmedAlias
                 chineseMode: appWindow.chineseMode
                 Controls.SplitView.preferredWidth: 300
                 Controls.SplitView.minimumWidth: 286
@@ -534,6 +558,9 @@ ApplicationWindow {
                 onRequestTopics: offset => requestTopics(offset)
                 onRequestLogs: offset => requestLogs(offset)
                 onRequestConnections: appController.requestConnectionList()
+                onRequestSelfConnection: appController.requestSelfConnection()
+                onUpdateAlias: alias => appController.setConnectionAlias(alias)
+                onForceUnsubscribe: (topic, fd) => appController.unsubscribeConnection(topic, fd)
                 onRequestSubscribers: topic => {
                     appWindow.selectedRuleTopic = topic
                     appController.requestTopicSubscribers(topic)

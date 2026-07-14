@@ -108,7 +108,7 @@ ProtocolAdapter::ParseResult ProtocolAdapter::tryParse(QByteArray *buffer, Frame
     const int type = static_cast<unsigned char>(buffer->at(0));
     const int topicLen = static_cast<unsigned char>(buffer->at(1));
     const int payloadLen = readU16(*buffer, 2);
-    if (type < Subscribe || type > FdTopicRelationResponse) {
+    if (type < Subscribe || type > UnsubscribeFdNotify) {
         if (error) *error = QStringLiteral("unknown message type: %1").arg(type);
         buffer->remove(0, 1);
         return ParseResult::Invalid;
@@ -132,6 +132,7 @@ ProtocolAdapter::ParseResult ProtocolAdapter::tryParse(QByteArray *buffer, Frame
     frame->retain = false;
     frame->dup = false;
     frame->packetId = 0;
+    frame->alias.clear();
     frame->rejectCode = 0;
     frame->rejectReason.clear();
     buffer->remove(0, total);
@@ -151,7 +152,28 @@ ProtocolAdapter::ParseResult ProtocolAdapter::tryParse(QByteArray *buffer, Frame
             if (error) *error = QStringLiteral("invalid extended publish fields");
             return ParseResult::Invalid;
         }
-        frame->payload = frame->payload.mid(PublishExHeaderBytes, innerLen);
+        const QByteArray extendedPayload = frame->payload;
+        const int aliasOffset = PublishExHeaderBytes + innerLen;
+        if (frame->type == Deliver && aliasOffset < extendedPayload.size()) {
+            const int aliasLen = static_cast<unsigned char>(extendedPayload.at(aliasOffset));
+            if (aliasLen > MaxAliasBytes || aliasOffset + 1 + aliasLen != extendedPayload.size()) {
+                if (error) *error = QStringLiteral("invalid delivery alias fields");
+                return ParseResult::Invalid;
+            }
+            frame->alias = QString::fromUtf8(extendedPayload.mid(aliasOffset + 1, aliasLen));
+        }
+        frame->payload = extendedPayload.mid(PublishExHeaderBytes, innerLen);
+    } else if (frame->type == Publish && frame->payload.size() >= 3) {
+        const int dataLen = readU16(frame->payload, 0);
+        const int aliasOffset = 2 + dataLen;
+        if (dataLen <= frame->payload.size() - 3 && aliasOffset < frame->payload.size()) {
+            const int aliasLen = static_cast<unsigned char>(frame->payload.at(aliasOffset));
+            if (aliasLen <= MaxAliasBytes && aliasOffset + 1 + aliasLen == frame->payload.size()) {
+                const QByteArray forwardedPayload = frame->payload;
+                frame->payload = forwardedPayload.mid(2, dataLen);
+                frame->alias = QString::fromUtf8(forwardedPayload.mid(aliasOffset + 1, aliasLen));
+            }
+        }
     } else if (frame->type == PubRec1 || frame->type == DeliverAck) {
         if (frame->payload.size() >= 2) {
             frame->packetId = readU16(frame->payload, 0);
@@ -352,6 +374,26 @@ QByteArray ProtocolAdapter::packTopicDeleteRequest(const QString &topic)
     return QByteArray();
 }
 
+QByteArray ProtocolAdapter::packAliasSetRequest(const QString &alias)
+{
+    QByteArray bytes = alias.toUtf8();
+    bytes.truncate(MaxAliasBytes);
+    QByteArray payload;
+    payload.append(static_cast<char>(bytes.size()));
+    payload.append(bytes);
+    return payload;
+}
+
+QByteArray ProtocolAdapter::packUnsubscribeFdRequest(int fd)
+{
+    QByteArray payload(4, '\0');
+    payload[0] = static_cast<char>((fd >> 24) & 0xff);
+    payload[1] = static_cast<char>((fd >> 16) & 0xff);
+    payload[2] = static_cast<char>((fd >> 8) & 0xff);
+    payload[3] = static_cast<char>(fd & 0xff);
+    return payload;
+}
+
 QVariantList ProtocolAdapter::parseConnectionList(const QByteArray &payload)
 {
     QVariantList result;
@@ -360,8 +402,8 @@ QVariantList ProtocolAdapter::parseConnectionList(const QByteArray &payload)
     int count = readU16(payload, 0);
     int pos = 2;
 
-    // Each entry: [fd:4B][ipv4:4B][port:2B] = 10 bytes
-    for (int i = 0; i < count && pos + 10 <= payload.size(); ++i) {
+    // Each entry: [fd:4B][ipv4:4B][port:2B][alias_len:1B][alias:N]
+    for (int i = 0; i < count && pos + 11 <= payload.size(); ++i) {
         QVariantMap entry;
 
         // Read fd (4 bytes big-endian)
@@ -382,9 +424,14 @@ QVariantList ProtocolAdapter::parseConnectionList(const QByteArray &payload)
         int port = readU16(payload, pos);
         pos += 2;
 
+        const int aliasLen = static_cast<unsigned char>(payload.at(pos++));
+        if (aliasLen > MaxAliasBytes || pos + aliasLen > payload.size()) break;
+
         entry.insert(QStringLiteral("fd"), fd);
         entry.insert(QStringLiteral("ip"), ipStr);
         entry.insert(QStringLiteral("port"), port);
+        entry.insert(QStringLiteral("alias"), QString::fromUtf8(payload.mid(pos, aliasLen)));
+        pos += aliasLen;
 
         result.append(entry);
     }
@@ -402,7 +449,7 @@ QVariantList ProtocolAdapter::parseTopicSubscribers(const QByteArray &payload)
     const int statusCount = payload.size() >= 3 ? readU16(payload, 1) : 0;
     const bool hasStatus = payload.size() >= 3
             && static_cast<unsigned char>(payload.at(0)) <= 1
-            && payload.size() >= 3 + statusCount * 10;
+            && payload.size() >= 3 + statusCount * 11;
     if (hasStatus) {
         count = statusCount;
         pos = 3;
@@ -413,7 +460,7 @@ QVariantList ProtocolAdapter::parseTopicSubscribers(const QByteArray &payload)
         return result;
     }
 
-    for (int i = 0; i < count && pos + 10 <= payload.size(); ++i) {
+    for (int i = 0; i < count && pos + 11 <= payload.size(); ++i) {
         QVariantMap entry;
         const int fd = (static_cast<unsigned char>(payload.at(pos)) << 24)
                      | (static_cast<unsigned char>(payload.at(pos + 1)) << 16)
@@ -427,10 +474,14 @@ QVariantList ProtocolAdapter::parseTopicSubscribers(const QByteArray &payload)
         }
         const int port = readU16(payload, pos);
         pos += 2;
+        const int aliasLen = static_cast<unsigned char>(payload.at(pos++));
+        if (aliasLen > MaxAliasBytes || pos + aliasLen > payload.size()) break;
 
         entry.insert(QStringLiteral("fd"), fd);
         entry.insert(QStringLiteral("ip"), formatIPv4(ip));
         entry.insert(QStringLiteral("port"), port);
+        entry.insert(QStringLiteral("alias"), QString::fromUtf8(payload.mid(pos, aliasLen)));
+        pos += aliasLen;
         result.append(entry);
     }
 
@@ -462,6 +513,54 @@ QVariantMap ProtocolAdapter::parseFdTopicRelation(const QByteArray &payload)
     result.insert(QStringLiteral("status"), static_cast<unsigned char>(payload.at(0)));
     result.insert(QStringLiteral("fd"), fd);
     result.insert(QStringLiteral("mask"), static_cast<unsigned char>(payload.at(5)));
+    if (payload.size() > 6) {
+        const int aliasLen = static_cast<unsigned char>(payload.at(6));
+        if (aliasLen <= MaxAliasBytes && 7 + aliasLen == payload.size()) {
+            result.insert(QStringLiteral("alias"), QString::fromUtf8(payload.mid(7, aliasLen)));
+        }
+    }
+    return result;
+}
+
+QString ProtocolAdapter::parseAliasPayload(const QByteArray &payload)
+{
+    if (payload.isEmpty()) return {};
+    const int aliasLen = static_cast<unsigned char>(payload.at(0));
+    if (aliasLen > MaxAliasBytes || aliasLen + 1 != payload.size()) return {};
+    return QString::fromUtf8(payload.mid(1, aliasLen));
+}
+
+QVariantMap ProtocolAdapter::parseSelfConnection(const QByteArray &payload)
+{
+    QVariantMap result;
+    if (payload.size() < 11) return result;
+    const int fd = (static_cast<unsigned char>(payload.at(0)) << 24)
+            | (static_cast<unsigned char>(payload.at(1)) << 16)
+            | (static_cast<unsigned char>(payload.at(2)) << 8)
+            | static_cast<unsigned char>(payload.at(3));
+    unsigned char ip[4];
+    for (int i = 0; i < 4; ++i) ip[i] = static_cast<unsigned char>(payload.at(4 + i));
+    const int aliasLen = static_cast<unsigned char>(payload.at(10));
+    if (aliasLen > MaxAliasBytes || 11 + aliasLen != payload.size()) return {};
+    result.insert(QStringLiteral("fd"), fd);
+    result.insert(QStringLiteral("ip"), formatIPv4(ip));
+    result.insert(QStringLiteral("port"), readU16(payload, 8));
+    result.insert(QStringLiteral("alias"), QString::fromUtf8(payload.mid(11, aliasLen)));
+    return result;
+}
+
+QVariantMap ProtocolAdapter::parseUnsubscribeFdResponse(const QByteArray &payload)
+{
+    QVariantMap result;
+    if (payload.size() < 5) return result;
+    const int fd = (static_cast<unsigned char>(payload.at(0)) << 24)
+            | (static_cast<unsigned char>(payload.at(1)) << 16)
+            | (static_cast<unsigned char>(payload.at(2)) << 8)
+            | static_cast<unsigned char>(payload.at(3));
+    const int aliasLen = static_cast<unsigned char>(payload.at(4));
+    if (aliasLen > MaxAliasBytes || 5 + aliasLen != payload.size()) return {};
+    result.insert(QStringLiteral("fd"), fd);
+    result.insert(QStringLiteral("alias"), QString::fromUtf8(payload.mid(5, aliasLen)));
     return result;
 }
 

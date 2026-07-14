@@ -11,6 +11,11 @@ ChatController::ChatController(QObject *parent)
         setStatusText(QStringLiteral("Connected"));
         appendLog(QStringLiteral("INFO"), QStringLiteral("connected to server"));
         emit connectedChanged();
+        if (!m_network.sendFrame(ProtocolAdapter::AliasSetRequest, QString(),
+                                 ProtocolAdapter::packAliasSetRequest(m_nickname))) {
+            appendLog(QStringLiteral("ERROR"), QStringLiteral("failed to set connection alias"));
+        }
+        requestSelfConnection();
     });
     connect(&m_network, &NetworkClient::disconnected, this, [this]() {
         setBusy(false);
@@ -59,10 +64,50 @@ void ChatController::connectToServer(const QString &host, int port, const QStrin
         return;
     }
     m_nickname = nickname.trimmed().isEmpty() ? QStringLiteral("guest") : nickname.trimmed();
+    if (m_nickname.toUtf8().size() > ProtocolAdapter::MaxAliasBytes) {
+        emit userMessage(QStringLiteral("Nickname must be at most %1 UTF-8 bytes").arg(ProtocolAdapter::MaxAliasBytes));
+        return;
+    }
     setBusy(true);
     setStatusText(QStringLiteral("Connecting"));
     appendLog(QStringLiteral("INFO"), QStringLiteral("connect %1:%2 as %3").arg(host.trimmed()).arg(port).arg(m_nickname));
     m_network.connectToHost(host.trimmed(), static_cast<quint16>(port));
+}
+
+void ChatController::requestSelfConnection()
+{
+    if (!m_network.sendFrame(ProtocolAdapter::SelfConnectionRequest, QString())) {
+        emit userMessage(QStringLiteral("failed to request self connection information"));
+    }
+}
+
+void ChatController::setConnectionAlias(const QString &alias)
+{
+    const QString normalized = alias.trimmed();
+    if (normalized.toUtf8().size() > ProtocolAdapter::MaxAliasBytes) {
+        emit userMessage(QStringLiteral("Alias must be at most %1 UTF-8 bytes").arg(ProtocolAdapter::MaxAliasBytes));
+        return;
+    }
+    if (!connected()) {
+        emit userMessage(QStringLiteral("Connect before changing the alias"));
+        return;
+    }
+    if (!m_network.sendFrame(ProtocolAdapter::AliasSetRequest, QString(),
+                             ProtocolAdapter::packAliasSetRequest(normalized))) {
+        emit userMessage(QStringLiteral("failed to send alias update"));
+    }
+}
+
+void ChatController::unsubscribeConnection(const QString &topic, int fd)
+{
+    if (!connected() || fd <= 0) {
+        emit userMessage(QStringLiteral("invalid forced unsubscribe request"));
+        return;
+    }
+    if (!m_network.sendFrame(ProtocolAdapter::UnsubscribeFdRequest, topic,
+                             ProtocolAdapter::packUnsubscribeFdRequest(fd))) {
+        emit userMessage(QStringLiteral("failed to send forced unsubscribe request"));
+    }
 }
 
 void ChatController::disconnectFromServer()
@@ -376,6 +421,7 @@ void ChatController::handleFrame(const ProtocolAdapter::Frame &frame)
         QString user;
         QString text;
         ProtocolAdapter::parseChatPayload(frame.payload, &user, &text);
+        if (!frame.alias.isEmpty()) user = frame.alias;
         if (!m_channels.contains(frame.topic)) {
             m_channels.insert(frame.topic);
             emit channelConfirmed(frame.topic);
@@ -454,6 +500,42 @@ void ChatController::handleFrame(const ProtocolAdapter::Frame &frame)
         appendLog(QStringLiteral("RECV"), QStringLiteral("connection list: %1 entries").arg(connections.size()));
         break;
     }
+    case ProtocolAdapter::SelfConnectionResponse: {
+        const QVariantMap connection = ProtocolAdapter::parseSelfConnection(frame.payload);
+        if (connection.isEmpty()) {
+            appendLog(QStringLiteral("ERROR"), QStringLiteral("invalid self connection response"));
+        } else {
+            emit selfConnectionReceived(connection);
+        }
+        break;
+    }
+    case ProtocolAdapter::AliasSetResponse: {
+        const QString alias = ProtocolAdapter::parseAliasPayload(frame.payload);
+        if (frame.payload.isEmpty() || !alias.isNull()) {
+            m_nickname = alias;
+            emit aliasConfirmed(alias);
+            appendLog(QStringLiteral("ACK"), QStringLiteral("alias confirmed: %1").arg(alias));
+        } else {
+            appendLog(QStringLiteral("ERROR"), QStringLiteral("invalid alias response"));
+        }
+        break;
+    }
+    case ProtocolAdapter::UnsubscribeFdResponse: {
+        const QVariantMap result = ProtocolAdapter::parseUnsubscribeFdResponse(frame.payload);
+        if (result.isEmpty()) {
+            appendLog(QStringLiteral("ERROR"), QStringLiteral("invalid forced unsubscribe response"));
+        } else {
+            emit connectionUnsubscribed(frame.topic, result.value(QStringLiteral("fd")).toInt(),
+                                        result.value(QStringLiteral("alias")).toString());
+        }
+        break;
+    }
+    case ProtocolAdapter::UnsubscribeFdNotify:
+        if (m_channels.remove(frame.topic)) {
+            emit channelRemoved(frame.topic);
+        }
+        emit userMessage(QStringLiteral("Server removed your subscription to %1").arg(frame.topic));
+        break;
     case ProtocolAdapter::TopicSubscribersResponse: {
         const QVariantList subscribers = ProtocolAdapter::parseTopicSubscribers(frame.payload);
         const int status = ProtocolAdapter::parseTopicSubscribersStatus(frame.payload);

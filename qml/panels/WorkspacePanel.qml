@@ -28,11 +28,16 @@ Rectangle {
     required property int selectedRuleFd
     required property string relationStatusText
     required property int relationMask
+    required property string ownConnectionText
+    required property string confirmedAlias
     required property bool chineseMode
 
     signal requestTopics(int offset)
     signal requestLogs(int offset)
     signal requestConnections()
+    signal requestSelfConnection()
+    signal updateAlias(string alias)
+    signal forceUnsubscribe(string topic, int fd)
     signal requestSubscribers(string topic)
     signal selectRuleFd(int fd)
     signal addRule(string topic, int mask)
@@ -193,6 +198,30 @@ Rectangle {
 
                     Rectangle {
                         Layout.fillWidth: true
+                        Layout.preferredHeight: 150
+                        radius: 16
+                        color: root.theme.panelAlt
+                        border.color: root.theme.line
+                        border.width: 1
+                        antialiasing: true
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 14
+                            spacing: 8
+                            SectionTitle { theme: root.theme; text: root.chineseMode ? "我的连接身份" : "My connection identity" }
+                            Label { Layout.fillWidth: true; text: root.ownConnectionText; color: root.theme.subtext; font.pixelSize: 12; elide: Text.ElideRight }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Field { id: aliasInput; theme: root.theme; Layout.fillWidth: true; text: root.confirmedAlias; placeholderText: root.chineseMode ? "别名（最多 32 UTF-8 字节）" : "Alias (max 32 UTF-8 bytes)"; enabled: root.chatController.connected }
+                                AppButton { theme: root.theme; text: root.chineseMode ? "保存" : "Save"; enabled: root.chatController.connected; onClicked: root.updateAlias(aliasInput.text) }
+                            }
+                            AppButton { theme: root.theme; Layout.fillWidth: true; text: root.chineseMode ? "查询服务端确认信息" : "Refresh server-confirmed identity"; fill: "transparent"; foreground: root.theme.accent; enabled: root.chatController.connected; onClicked: root.requestSelfConnection() }
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
                         Layout.preferredHeight: 142
                         radius: 16
                         color: root.theme.panelAlt
@@ -292,7 +321,7 @@ Rectangle {
                                         }
                                         Label {
                                             Layout.fillWidth: true
-                                            text: model.ip + ":" + model.port
+                                            text: (model.alias ? model.alias + " · " : "") + model.ip + ":" + model.port
                                             color: root.theme.subtext
                                             font.pixelSize: 12
                                             elide: Text.ElideRight
@@ -314,7 +343,7 @@ Rectangle {
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 268
+                        Layout.preferredHeight: 318
                         radius: 16
                         color: root.theme.panelAlt
                         border.color: root.theme.line
@@ -417,6 +446,17 @@ Rectangle {
                                     foreground: root.theme.accent
                                     onClicked: root.checkRelation(ruleTopicInput.text.trim())
                                 }
+                                AppButton {
+                                    theme: root.theme
+                                    Layout.columnSpan: 2
+                                    Layout.fillWidth: true
+                                    text: root.chineseMode ? "强制取消该 fd 的订阅" : "Force unsubscribe selected fd"
+                                    enabled: root.chatController.connected && root.selectedRuleFd > 0 && ruleTopicInput.text.trim().length > 0
+                                    fill: root.theme.danger
+                                    hoverFill: root.theme.dangerHover
+                                    foreground: root.theme.accentText
+                                    onClicked: root.forceUnsubscribe(ruleTopicInput.text.trim(), root.selectedRuleFd)
+                                }
                             }
 
                             Label {
@@ -452,7 +492,7 @@ Rectangle {
                                 anchors.leftMargin: 10
                                 anchors.rightMargin: 10
                                 Label { Layout.preferredWidth: 58; text: "fd " + model.fd; color: root.theme.text; font.pixelSize: 12; font.weight: Font.Medium }
-                                Label { Layout.fillWidth: true; text: model.ip + ":" + model.port; color: root.theme.subtext; font.pixelSize: 12; elide: Text.ElideRight }
+                                Label { Layout.fillWidth: true; text: (model.alias ? model.alias + " · " : "") + model.ip + ":" + model.port; color: root.theme.subtext; font.pixelSize: 12; elide: Text.ElideRight }
                             }
                             MouseArea {
                                 anchors.fill: parent

@@ -33,12 +33,15 @@ public:
     Q_INVOKABLE bool requestServerTopics(int offset, int limit, bool includeEmpty);
     Q_INVOKABLE void requestServerSnapshot();
     Q_INVOKABLE void requestConnectionList();
+    Q_INVOKABLE void requestSelfConnection();
+    Q_INVOKABLE void setConnectionAlias(const QString &alias);
     Q_INVOKABLE void requestTopicSubscribers(const QString &topic);
     Q_INVOKABLE void requestFdTopicRelation(const QString &topic, int fd);
     Q_INVOKABLE void createTopic(const QString &topic);
     Q_INVOKABLE void deleteTopic(const QString &topic);
     Q_INVOKABLE void setRule(const QString &topic, int ruleMask, bool add);
     Q_INVOKABLE void setConnectionRule(const QString &topic, int fd, int ruleMask, bool add);
+    Q_INVOKABLE void unsubscribeConnection(const QString &topic, int fd);
     Q_INVOKABLE void addForwardRule(const QString &sourceTopic, const QString &targetTopic);
     Q_INVOKABLE void deleteForwardRule(const QString &sourceTopic, const QString &targetTopic);
 
@@ -58,6 +61,9 @@ signals:
     void serverTopicsReceived(QVariantList rows, int total, int offset, bool hasMore);
     void serverSnapshotReceived(QString title, QString body);
     void serverConnectionsReceived(QVariantList connections);
+    void selfConnectionReceived(QVariantMap connection);
+    void aliasConfirmed(QString alias);
+    void connectionUnsubscribed(QString topic, int fd, QString alias);
     void topicSubscribersReceived(QString topic, QVariantList subscribers);
     void topicSubscribersStateReceived(QString topic, int status);
     void fdTopicRelationReceived(QString topic, int fd, int status, int relationMask);

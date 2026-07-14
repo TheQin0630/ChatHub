@@ -92,7 +92,7 @@ cmake --build build\Desktop_Qt_6_11_1_MinGW_64_bit_Debug --target ChatHub_qmllin
 
 ## Mock Server
 
-项目提供 `tests/mock_server.py` 作为本地演示服务器，支持基本连接、订阅、退订、普通发布、扩展发布、Retain、QoS1 ack、日志查询和 topic 列表查询。
+项目提供 `tests/mock_server.py` 作为本地全协议演示服务器，支持频道、订阅、普通/可靠/保留消息、别名、连接/订阅者查询、规则、强制退订与日志分页。完整命令、自动化测试和答辩流程见 [联调与演示指南](docs/联调与演示指南.md)。
 
 ```powershell
 python tests\mock_server.py --host 127.0.0.1 --port 1883

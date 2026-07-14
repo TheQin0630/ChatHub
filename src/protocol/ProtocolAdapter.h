@@ -39,7 +39,14 @@ public:
         TopicDeleteRequest = 26,
         TopicDeleteResponse = 27,
         FdTopicRelationRequest = 28,
-        FdTopicRelationResponse = 29
+        FdTopicRelationResponse = 29,
+        SelfConnectionRequest = 30,
+        SelfConnectionResponse = 31,
+        UnsubscribeFdRequest = 32,
+        UnsubscribeFdResponse = 33,
+        AliasSetRequest = 34,
+        AliasSetResponse = 35,
+        UnsubscribeFdNotify = 36
     };
 
     struct Frame {
@@ -51,6 +58,7 @@ public:
         bool retain = false;
         bool dup = false;
         int packetId = 0;
+        QString alias;
 
         // For reject messages (future protocol support)
         int rejectCode = 0;      // 0=success, 1=not_found, 2=denied, 3=invalid
@@ -78,6 +86,7 @@ public:
 
     static constexpr int MaxTopicBytes = 64;
     static constexpr int MaxPayloadBytes = 2048;
+    static constexpr int MaxAliasBytes = 32;
     static constexpr int HeaderBytes = 4;
     static constexpr int PageRequestBytes = 7;
     static constexpr int PageResponseHeaderBytes = 9;
@@ -93,6 +102,8 @@ public:
     static QByteArray packFdTopicRelationRequest(int fd);
     static QByteArray packTopicCreateRequest(const QString &topic);
     static QByteArray packTopicDeleteRequest(const QString &topic);
+    static QByteArray packAliasSetRequest(const QString &alias);
+    static QByteArray packUnsubscribeFdRequest(int fd);
 
     static ParseResult tryParse(QByteArray *buffer, Frame *frame, QString *error);
     static bool isTopicValid(const QString &topic, QString *error = nullptr);
@@ -110,6 +121,9 @@ public:
     static int parseTopicCreateResponse(const QByteArray &payload);
     static int parseTopicDeleteResponse(const QByteArray &payload);
     static int parseRuleSetResponse(const QByteArray &payload);
+    static QVariantMap parseSelfConnection(const QByteArray &payload);
+    static QVariantMap parseUnsubscribeFdResponse(const QByteArray &payload);
+    static QString parseAliasPayload(const QByteArray &payload);
 
 private:
     static int readU16(const QByteArray &data, int offset);

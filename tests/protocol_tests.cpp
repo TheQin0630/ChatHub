@@ -200,12 +200,15 @@ int main(int argc, char *argv[])
     connPayload.append('\1');
     connPayload.append('\x30');
     connPayload.append('\x39');
+    connPayload.append('\5');
+    connPayload.append("alice");
     const QVariantList connections = ProtocolAdapter::parseConnectionList(connPayload);
     require(connections.size() == 1, "expected one connection");
     require(connections.first().toMap().value(QStringLiteral("fd")).toInt() == 7, "expected parsed fd");
     require(connections.first().toMap().value(QStringLiteral("ip")).toString() == QStringLiteral("127.0.0.1"),
             "expected standard loopback ip formatting");
     require(connections.first().toMap().value(QStringLiteral("port")).toInt() == 12345, "expected parsed port");
+    require(connections.first().toMap().value(QStringLiteral("alias")).toString() == QStringLiteral("alice"), "expected connection alias");
 
     QByteArray subsPayload;
     subsPayload.append('\0'); // TOPIC_SUBS_STATUS_OK
@@ -216,6 +219,7 @@ int main(int argc, char *argv[])
     const QVariantList subscribers = ProtocolAdapter::parseTopicSubscribers(subsPayload);
     require(subscribers.size() == 1, "expected one topic subscriber");
     require(subscribers.first().toMap().value(QStringLiteral("fd")).toInt() == 7, "expected subscriber fd");
+    require(subscribers.first().toMap().value(QStringLiteral("alias")).toString() == QStringLiteral("alice"), "expected subscriber alias");
 
     QByteArray missingSubsPayload;
     missingSubsPayload.append('\1'); // TOPIC_SUBS_STATUS_TOPIC_NOT_FOUND
@@ -236,10 +240,30 @@ int main(int argc, char *argv[])
     relationPayload.append('\0');
     relationPayload.append('\7');
     relationPayload.append('\5'); // REL_SUBSCRIBED | REL_DENY_RECV
+    relationPayload.append('\5');
+    relationPayload.append("alice");
     const QVariantMap relation = ProtocolAdapter::parseFdTopicRelation(relationPayload);
     require(relation.value(QStringLiteral("status")).toInt() == 0, "expected relation status ok");
     require(relation.value(QStringLiteral("fd")).toInt() == 7, "expected relation fd");
     require(relation.value(QStringLiteral("mask")).toInt() == 5, "expected relation mask");
+    require(relation.value(QStringLiteral("alias")).toString() == QStringLiteral("alice"), "expected relation alias");
+
+    const QByteArray aliasRequest = ProtocolAdapter::packAliasSetRequest(QStringLiteral("alice"));
+    require(aliasRequest == QByteArray("\x05" "alice"), "expected alias request payload");
+    require(ProtocolAdapter::parseAliasPayload(aliasRequest) == QStringLiteral("alice"), "expected alias response parsing");
+
+    QByteArray forwardedPayload;
+    forwardedPayload.append('\0');
+    forwardedPayload.append(static_cast<char>(payload.size()));
+    forwardedPayload.append(payload);
+    forwardedPayload.append('\5');
+    forwardedPayload.append("alice");
+    stream = ProtocolAdapter::pack(ProtocolAdapter::Publish, QStringLiteral("room/general"), forwardedPayload);
+    require(ProtocolAdapter::tryParse(&stream, &frame, &error) == ProtocolAdapter::ParseResult::Complete,
+            "expected forwarded publish frame");
+    require(frame.alias == QStringLiteral("alice"), "expected forwarded publish alias");
+    ProtocolAdapter::parseChatPayload(frame.payload, &user, &text);
+    require(text == QStringLiteral("hello"), "expected forwarded business payload");
 
     qDebug() << "All protocol tests passed!";
     return 0;

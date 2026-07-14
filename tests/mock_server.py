@@ -1,203 +1,129 @@
 #!/usr/bin/env python3
-import argparse
-import selectors
-import socket
-import struct
-import time
+"""ChatHub 全协议本地 mock 服务端（仅 Python 标准库）。"""
+import argparse, selectors, socket, struct, time
 
-MSG_SUBSCRIBE = 1
-MSG_UNSUBSCRIBE = 2
-MSG_PUBLISH = 3
-MSG_SUBACK = 4
-MSG_PUBACK = 5
-MSG_LOG_QUERY = 6
-MSG_SUB_QUERY = 7
-MSG_LOG_LIST_REQ = 8
-MSG_LOG_LIST_RESP = 9
-MSG_TOPIC_LIST_REQ = 10
-MSG_TOPIC_LIST_RESP = 11
-MSG_PUBLISH_EX = 12
-MSG_PUBREC1 = 13
-MSG_DELIVER = 14
-MSG_DELIVER_ACK = 15
+SUB, UNSUB, PUB, SUBACK, PUBACK, LOGQ, SUBQ, LOGREQ, LOGRESP, TOPREQ, TOPRESP = range(1, 12)
+PUBEX, PUBREC, DELIVER, DELIVER_ACK = 12, 13, 14, 15
+CONNREQ, CONNRESP, SUBSREQ, SUBSRESP, RULEREQ, RULERESP = 16, 17, 18, 19, 20, 21
+SUBREJ, PUBREJ, CREATE, CREATERESP, DELETE, DELETERESP, RELREQ, RELRESP = 22, 23, 24, 25, 26, 27, 28, 29
+SELFREQ, SELFRESP, UNSUBFD, UNSUBFDRESP, ALIASREQ, ALIASRESP, UNSUBFDNOTICE = 30, 31, 32, 33, 34, 35, 36
 
-FLAG_RETAIN = 0x01
-FLAG_QOS_SHIFT = 1
-FLAG_DUP = 0x08
+def pack(kind, topic="", payload=b""):
+    topic = topic.encode() if isinstance(topic, str) else topic
+    return struct.pack("!BBH", kind, len(topic), len(payload)) + topic + payload
 
-TOPIC_MAX_LEN = 64
-PAYLOAD_MAX_LEN = 2048
-HEADER_LEN = 4
-PUBEX_HEADER = 5
-PAGE_REQ_LEN = 7
-PAGE_RESP_HEADER = 9
+def entry(client):
+    ip = socket.inet_aton(client.addr[0]); alias = client.alias.encode()
+    return struct.pack("!I", client.fd) + ip + struct.pack("!H", client.addr[1]) + bytes([len(alias)]) + alias
 
+def frame_from(buffer):
+    if len(buffer) < 4: return None, buffer
+    kind, tl, pl = struct.unpack("!BBH", buffer[:4]); size = 4 + tl + pl
+    if len(buffer) < size: return None, buffer
+    return (kind, buffer[4:4+tl].decode(errors="replace"), buffer[4+tl:size]), buffer[size:]
 
-def pack(msg_type, topic, payload=b""):
-    topic_bytes = topic.encode("utf-8")
-    if len(topic_bytes) > TOPIC_MAX_LEN or len(payload) > PAYLOAD_MAX_LEN:
-        raise ValueError("frame too large")
-    return struct.pack("!BBH", msg_type, len(topic_bytes), len(payload)) + topic_bytes + payload
-
-
-def pack_ex(msg_type, topic, payload, qos=0, retain=False, packet_id=0, dup=False):
-    flags = 0
-    if retain:
-        flags |= FLAG_RETAIN
-    flags |= (qos << FLAG_QOS_SHIFT) & 0x06
-    if dup:
-        flags |= FLAG_DUP
-    inner = struct.pack("!BHH", flags, packet_id, len(payload)) + payload
-    return pack(msg_type, topic, inner)
-
-
-def pack_ack(msg_type, topic, packet_id):
-    return pack(msg_type, topic, struct.pack("!HB", packet_id, 0))
-
-
-def unpack_frame(buffer):
-    if len(buffer) < HEADER_LEN:
-        return None, buffer
-    msg_type, topic_len, payload_len = struct.unpack("!BBH", buffer[:HEADER_LEN])
-    total = HEADER_LEN + topic_len + payload_len
-    if len(buffer) < total:
-        return None, buffer
-    topic = buffer[HEADER_LEN:HEADER_LEN + topic_len].decode("utf-8", errors="replace")
-    payload = buffer[HEADER_LEN + topic_len:total]
-    frame = {"type": msg_type, "topic": topic, "payload": payload, "qos": 0, "retain": False, "packet_id": 0}
-    if msg_type in (MSG_PUBLISH_EX, MSG_DELIVER) and len(payload) >= PUBEX_HEADER:
-        flags, packet_id, inner_len = struct.unpack("!BHH", payload[:PUBEX_HEADER])
-        frame["qos"] = (flags & 0x06) >> FLAG_QOS_SHIFT
-        frame["retain"] = bool(flags & FLAG_RETAIN)
-        frame["packet_id"] = packet_id
-        frame["payload"] = payload[PUBEX_HEADER:PUBEX_HEADER + inner_len]
-    elif msg_type in (MSG_PUBREC1, MSG_DELIVER_ACK) and len(payload) >= 2:
-        frame["packet_id"] = struct.unpack("!H", payload[:2])[0]
-    return frame, buffer[total:]
-
-
-def pack_page_response(msg_type, request_id, total, offset, rows, has_more, row_encoder):
-    body = struct.pack("!HHHHB", request_id, total, offset, len(rows), 1 if has_more else 0)
-    for row in rows:
-        body += row_encoder(row)
-    return pack(msg_type, "", body)
-
+def page(kind, req, total, offset, rows):
+    data = struct.pack("!HHHHB", req, total, offset, len(rows), int(offset + len(rows) < total))
+    for row in rows: data += bytes([min(255, len(row))]) + row[:255]
+    return pack(kind, payload=data)
 
 class Client:
-    def __init__(self, sock):
-        self.sock = sock
-        self.buffer = b""
-        self.subscriptions = set()
+    def __init__(self, sock, addr, fd): self.sock, self.addr, self.fd, self.buf, self.alias, self.subs = sock, addr, fd, b"", "", set()
+    def send(self, kind, topic="", payload=b""): self.sock.sendall(pack(kind, topic, payload))
 
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=1883)
-    args = parser.parse_args()
-
-    selector = selectors.DefaultSelector()
-    clients = {}
-    retained = {}
-    logs = []
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind((args.host, args.port))
-    server.listen()
-    server.setblocking(False)
-    selector.register(server, selectors.EVENT_READ)
-    print(f"mock server listening on {args.host}:{args.port}", flush=True)
-
-    def log(line):
-        stamp = time.strftime("%H:%M:%S")
-        logs.append(f"{stamp} {line}")
-        del logs[:-200]
-
-    def topic_rows():
-        topics = sorted({topic for client in clients.values() for topic in client.subscriptions} | set(retained.keys()))
-        return [(topic, sum(1 for client in clients.values() if topic in client.subscriptions)) for topic in topics]
-
-    try:
+class Mock:
+    def __init__(self, host, port):
+        self.sel, self.clients, self.topics, self.retain, self.rules, self.logs = selectors.DefaultSelector(), {}, set(), {}, {}, []
+        self.nextfd = 10; self.server = socket.socket(); self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server.bind((host, port)); self.server.listen(); self.server.setblocking(False); self.sel.register(self.server, selectors.EVENT_READ)
+    def log(self, text): self.logs.append(time.strftime("%H:%M:%S ") + text); self.logs = self.logs[-200:]
+    def client_by_fd(self, fd): return next((c for c in self.clients.values() if c.fd == fd), None)
+    def permitted(self, c, topic, bit): return not (self.rules.get((c.fd, topic), 0) & bit)
+    def deliver(self, c, topic, data, alias, flags=0, packet=0):
+        if not self.permitted(c, topic, 4): return
+        raw = alias.encode(); payload = struct.pack("!BHH", flags, packet, len(data)) + data + bytes([len(raw)]) + raw
+        c.send(DELIVER, topic, payload)
+    def normal(self, c, topic, data, alias):
+        raw = alias.encode(); c.send(PUB, topic, struct.pack("!H", len(data)) + data + bytes([len(raw)]) + raw)
+    def handle(self, c, kind, topic, payload):
+        if kind == ALIASREQ:
+            if not payload or payload[0] > 32 or len(payload) != payload[0] + 1: return
+            c.alias = payload[1:].decode(errors="replace"); c.send(ALIASRESP, payload=payload); self.log(f"alias fd={c.fd} {c.alias}")
+        elif kind == SELFREQ: c.send(SELFRESP, payload=entry(c))
+        elif kind == CREATE:
+            exists = topic in self.topics; self.topics.add(topic); c.send(CREATERESP, topic, bytes([1 if exists else 0]))
+        elif kind == DELETE:
+            exists = topic in self.topics; self.topics.discard(topic); self.retain.pop(topic, None)
+            for x in self.clients.values(): x.subs.discard(topic)
+            c.send(DELETERESP, topic, bytes([0 if exists else 1]))
+        elif kind == SUB:
+            if topic not in self.topics: c.send(SUBREJ, topic, b"\x02topic not found")
+            elif not self.permitted(c, topic, 2): c.send(SUBREJ, topic, b"\x01subscription denied")
+            else:
+                c.subs.add(topic); c.send(SUBACK, topic)
+                if topic in self.retain:
+                    data, alias, flags, pid = self.retain[topic]; self.deliver(c, topic, data, alias, flags, pid)
+        elif kind == UNSUB: c.subs.discard(topic)
+        elif kind == PUB:
+            if not self.permitted(c, topic, 8): c.send(PUBREJ, topic, b"\x01publish denied")
+            else:
+                for x in self.clients.values():
+                    if topic in x.subs: self.normal(x, topic, payload, c.alias)
+                c.send(PUBACK, topic); self.log(f"publish {topic}")
+        elif kind == PUBEX and len(payload) >= 5:
+            flags, pid, size = struct.unpack("!BHH", payload[:5]); data = payload[5:5+size]
+            if len(data) != size or not self.permitted(c, topic, 8): c.send(PUBREJ, topic, b"\x01publish denied")
+            else:
+                if flags & 1: self.retain[topic] = (data, c.alias, flags, pid)
+                for x in self.clients.values():
+                    if topic in x.subs: self.deliver(x, topic, data, c.alias, flags, pid)
+                if ((flags >> 1) & 3) == 1: c.send(PUBREC, topic, struct.pack("!HB", pid, 0))
+        elif kind == CONNREQ:
+            rows = b"".join(entry(x) for x in self.clients.values()); c.send(CONNRESP, payload=struct.pack("!H", len(self.clients)) + rows)
+        elif kind == SUBSREQ:
+            if topic not in self.topics: c.send(SUBSRESP, topic, b"\x01\0\0")
+            else:
+                rows = [x for x in self.clients.values() if topic in x.subs]; c.send(SUBSRESP, topic, b"\0" + struct.pack("!H", len(rows)) + b"".join(entry(x) for x in rows))
+        elif kind == RULEREQ and len(payload) >= 6:
+            op, mask, fd = payload[0], payload[1], struct.unpack("!I", payload[2:6])[0]; target = self.client_by_fd(fd); status = 0 if target else 5
+            if target:
+                key = (fd, topic); self.rules[key] = (self.rules.get(key, 0) | mask) if op == 1 else (self.rules.get(key, 0) & ~mask)
+            c.send(RULERESP, topic, bytes([status, op, mask]) + struct.pack("!I", fd) + bytes([len(target.alias.encode()) if target else 0]) + (target.alias.encode() if target else b""))
+        elif kind == RELREQ and len(payload) >= 4:
+            fd = struct.unpack("!I", payload[:4])[0]; target = self.client_by_fd(fd); mask = self.rules.get((fd, topic), 0)
+            if target and topic in target.subs: mask |= 1
+            c.send(RELRESP, topic, bytes([0 if target else 1]) + struct.pack("!I", fd) + bytes([mask, len(target.alias.encode()) if target else 0]) + (target.alias.encode() if target else b""))
+        elif kind == UNSUBFD and len(payload) >= 4:
+            fd = struct.unpack("!I", payload[:4])[0]; target = self.client_by_fd(fd)
+            if target: target.subs.discard(topic); target.send(UNSUBFDNOTICE, topic)
+            alias = target.alias.encode() if target else b""; c.send(UNSUBFDRESP, topic, struct.pack("!I", fd) + bytes([len(alias)]) + alias)
+        elif kind == LOGQ: c.send(LOGQ, payload="\n".join(self.logs).encode())
+        elif kind == SUBQ: c.send(SUBQ, payload="\n".join(sorted(self.topics)).encode())
+        elif kind == LOGREQ and len(payload) >= 7:
+            req, offset, limit, order = struct.unpack("!HHHB", payload[:7]); rows = list(reversed(self.logs)) if order else self.logs
+            rows = [r.encode() for r in rows]; c.sock.sendall(page(LOGRESP, req, len(rows), offset, rows[offset:offset+limit]))
+        elif kind == TOPREQ and len(payload) >= 7:
+            req, offset, limit, _ = struct.unpack("!HHHB", payload[:7]); rows = sorted(self.topics); selected = rows[offset:offset+limit]
+            data = struct.pack("!HHHHB", req, len(rows), offset, len(selected), int(offset + len(selected) < len(rows)))
+            for name in selected:
+                raw = name.encode(); data += bytes([len(raw)]) + raw + struct.pack("!H", sum(name in x.subs for x in self.clients.values()))
+            c.send(TOPRESP, payload=data)
+    def run(self):
+        print(f"mock server listening on {self.server.getsockname()[0]}:{self.server.getsockname()[1]}", flush=True)
         while True:
-            for key, _ in selector.select():
-                if key.fileobj is server:
-                    sock, addr = server.accept()
-                    sock.setblocking(False)
-                    clients[sock] = Client(sock)
-                    selector.register(sock, selectors.EVENT_READ)
-                    log(f"connect {addr[0]}:{addr[1]}")
-                    continue
-
-                client = clients[key.fileobj]
-                data = client.sock.recv(4096)
+            for key, _ in self.sel.select():
+                if key.fileobj is self.server:
+                    sock, addr = self.server.accept(); sock.setblocking(False); c = Client(sock, addr, self.nextfd); self.nextfd += 1; self.clients[sock] = c; self.sel.register(sock, selectors.EVENT_READ); self.log(f"connect {c.fd}"); continue
+                c = self.clients[key.fileobj]
+                try: data = c.sock.recv(4096)
+                except OSError: data = b""
                 if not data:
-                    selector.unregister(client.sock)
-                    clients.pop(client.sock, None)
-                    client.sock.close()
-                    continue
-                client.buffer += data
+                    self.sel.unregister(c.sock); self.clients.pop(c.sock, None); c.sock.close(); continue
+                c.buf += data
                 while True:
-                    frame, client.buffer = unpack_frame(client.buffer)
-                    if frame is None:
-                        break
-                    msg_type = frame["type"]
-                    topic = frame["topic"]
-                    payload = frame["payload"]
-                    if msg_type == MSG_SUBSCRIBE:
-                        client.subscriptions.add(topic)
-                        log(f"sub {topic}")
-                        client.sock.sendall(pack(MSG_SUBACK, topic))
-                        if topic in retained:
-                            packet_id, retained_payload = retained[topic]
-                            client.sock.sendall(pack_ex(MSG_DELIVER, topic, retained_payload, qos=1, retain=True, packet_id=packet_id))
-                    elif msg_type == MSG_UNSUBSCRIBE:
-                        client.subscriptions.discard(topic)
-                        log(f"unsub {topic}")
-                    elif msg_type == MSG_PUBLISH:
-                        client.sock.sendall(pack(MSG_PUBACK, topic))
-                        packet = pack(MSG_PUBLISH, topic, payload)
-                        for other in list(clients.values()):
-                            if other is not client and topic in other.subscriptions:
-                                other.sock.sendall(packet)
-                        log(f"pub {topic}")
-                    elif msg_type == MSG_PUBLISH_EX:
-                        if frame["retain"]:
-                            retained[topic] = (frame["packet_id"], payload)
-                        packet = pack_ex(MSG_DELIVER, topic, payload, qos=frame["qos"], retain=frame["retain"], packet_id=frame["packet_id"])
-                        for other in list(clients.values()):
-                            if other is not client and topic in other.subscriptions:
-                                other.sock.sendall(packet)
-                        if frame["qos"] == 1:
-                            client.sock.sendall(pack_ack(MSG_PUBREC1, topic, frame["packet_id"]))
-                        log(f"pubex {topic} qos={frame['qos']} retain={frame['retain']}")
-                    elif msg_type == MSG_DELIVER_ACK:
-                        log(f"deliver_ack {frame['packet_id']}")
-                    elif msg_type == MSG_LOG_QUERY:
-                        client.sock.sendall(pack(MSG_LOG_QUERY, "", "\n".join(logs).encode()))
-                    elif msg_type == MSG_SUB_QUERY:
-                        text = "\n".join(f"{topic} -> {count}" for topic, count in topic_rows())
-                        client.sock.sendall(pack(MSG_SUB_QUERY, "", text.encode()))
-                    elif msg_type == MSG_LOG_LIST_REQ and len(payload) >= PAGE_REQ_LEN:
-                        request_id, offset, limit, order = struct.unpack("!HHHB", payload[:PAGE_REQ_LEN])
-                        rows = list(reversed(logs)) if order else logs
-                        page = rows[offset:offset + limit]
-                        response = pack_page_response(
-                            MSG_LOG_LIST_RESP, request_id, len(rows), offset, page, offset + limit < len(rows),
-                            lambda row: bytes([min(len(row.encode()), 255)]) + row.encode()[:255],
-                        )
-                        client.sock.sendall(response)
-                    elif msg_type == MSG_TOPIC_LIST_REQ and len(payload) >= PAGE_REQ_LEN:
-                        request_id, offset, limit, _include_empty = struct.unpack("!HHHB", payload[:PAGE_REQ_LEN])
-                        rows = topic_rows()
-                        page = rows[offset:offset + limit]
-                        response = pack_page_response(
-                            MSG_TOPIC_LIST_RESP, request_id, len(rows), offset, page, offset + limit < len(rows),
-                            lambda row: bytes([len(row[0].encode())]) + row[0].encode() + struct.pack("!H", row[1]),
-                        )
-                        client.sock.sendall(response)
-    except KeyboardInterrupt:
-        pass
-
+                    frame, c.buf = frame_from(c.buf)
+                    if frame is None: break
+                    self.handle(c, *frame)
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser(); ap.add_argument("--host", default="127.0.0.1"); ap.add_argument("--port", type=int, default=1883); args = ap.parse_args(); Mock(args.host, args.port).run()
