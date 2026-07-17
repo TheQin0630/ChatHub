@@ -187,7 +187,9 @@ bool ChatController::publishMessageAdvanced(const QString &topic, const QString 
         const ProtocolAdapter::Frame frame = ProtocolAdapter::makeExtendedPublish(normalized, payload, 1, retain, packetId);
         if (m_network.sendFrame(frame)) {
             const QDateTime timestamp = QDateTime::currentDateTime();
-            m_pendingPublishes.enqueue({normalized, body, timestamp, packetId, clientMessageId, true});
+            const PendingPublish pending{normalized, body, timestamp, packetId, clientMessageId, true};
+            m_pendingPublishes.enqueue(pending);
+            rememberOwnPublish(pending);
             emit outgoingMessageQueued(normalized, m_nickname, body, timestamp.time().toString(QStringLiteral("HH:mm")), clientMessageId);
             appendLog(QStringLiteral("SEND"), QStringLiteral("publish_ex %1 packet=%2 retain=%3 bytes=%4")
                       .arg(normalized).arg(packetId).arg(retain ? 1 : 0).arg(payload.size()));
@@ -200,7 +202,9 @@ bool ChatController::publishMessageAdvanced(const QString &topic, const QString 
     if (m_network.sendFrame(ProtocolAdapter::Publish, normalized, payload)) {
         const int clientMessageId = m_nextClientMessageId++;
         const QDateTime timestamp = QDateTime::currentDateTime();
-        m_pendingPublishes.enqueue({normalized, body, timestamp, 0, clientMessageId, false});
+        const PendingPublish pending{normalized, body, timestamp, 0, clientMessageId, false};
+        m_pendingPublishes.enqueue(pending);
+        rememberOwnPublish(pending);
         emit outgoingMessageQueued(normalized, m_nickname, body, timestamp.time().toString(QStringLiteral("HH:mm")), clientMessageId);
         appendLog(QStringLiteral("SEND"), QStringLiteral("publish %1 bytes=%2").arg(normalized).arg(payload.size()));
         return true;
@@ -428,6 +432,15 @@ void ChatController::handleFrame(const ProtocolAdapter::Frame &frame)
         QString text;
         ProtocolAdapter::parseChatPayload(frame.payload, &user, &text);
         if (!frame.alias.isEmpty()) user = frame.alias;
+        const bool ownEcho = isOwnPublishEcho(frame.topic, user, text);
+        if (frame.type == ProtocolAdapter::Deliver && frame.qos == 1 && frame.packetId > 0) {
+            m_network.sendFrame(ProtocolAdapter::makeDeliverAck(frame.topic, frame.packetId));
+            appendLog(QStringLiteral("SEND"), QStringLiteral("deliver_ack packet=%1").arg(frame.packetId));
+        }
+        if (ownEcho) {
+            appendLog(QStringLiteral("RECV"), QStringLiteral("suppressed own publish echo: %1").arg(frame.topic));
+            break;
+        }
         if (!m_channels.contains(frame.topic)) {
             m_channels.insert(frame.topic);
             emit channelConfirmed(frame.topic);
@@ -435,10 +448,6 @@ void ChatController::handleFrame(const ProtocolAdapter::Frame &frame)
         }
         const bool isRetained = frame.type == ProtocolAdapter::Deliver && frame.retain;
         emit incomingMessage(frame.topic, user, text, false, isRetained, isRetained ? QStringLiteral("retained") : QString(), QTime::currentTime().toString(QStringLiteral("HH:mm")));
-        if (frame.type == ProtocolAdapter::Deliver && frame.qos == 1 && frame.packetId > 0) {
-            m_network.sendFrame(ProtocolAdapter::makeDeliverAck(frame.topic, frame.packetId));
-            appendLog(QStringLiteral("SEND"), QStringLiteral("deliver_ack packet=%1").arg(frame.packetId));
-        }
         break;
     }
     case ProtocolAdapter::LogQuery:
@@ -615,6 +624,7 @@ void ChatController::resetSessionState(const QString &reason)
 
     const QList<QString> topics = m_channels.values();
     m_channels.clear();
+    m_recentOwnPublishes.clear();
     for (const QString &topic : topics) {
         emit channelRemoved(topic);
     }
@@ -643,6 +653,41 @@ bool ChatController::confirmPendingPublish(const ProtocolAdapter::Frame &frame)
         emit publishAck(item.topic);
         emit outgoingMessageConfirmed(item.clientMessageId);
         return true;
+    }
+    return false;
+}
+
+void ChatController::rememberOwnPublish(const PendingPublish &publish)
+{
+    const QDateTime now = QDateTime::currentDateTime();
+    while (!m_recentOwnPublishes.isEmpty()
+           && m_recentOwnPublishes.head().timestamp.msecsTo(now) > 15000) {
+        m_recentOwnPublishes.dequeue();
+    }
+    m_recentOwnPublishes.enqueue(publish);
+    while (m_recentOwnPublishes.size() > 32) {
+        m_recentOwnPublishes.dequeue();
+    }
+}
+
+bool ChatController::isOwnPublishEcho(const QString &topic, const QString &user, const QString &message)
+{
+    // The local optimistic bubble is already shown by outgoingMessageQueued.
+    // Suppress only a recent server echo that exactly matches this client's alias,
+    // topic and payload, so messages from other clients remain visible.
+    if (user != m_nickname) {
+        return false;
+    }
+
+    const QDateTime now = QDateTime::currentDateTime();
+    while (!m_recentOwnPublishes.isEmpty()
+           && m_recentOwnPublishes.head().timestamp.msecsTo(now) > 15000) {
+        m_recentOwnPublishes.dequeue();
+    }
+    for (const PendingPublish &candidate : m_recentOwnPublishes) {
+        if (candidate.topic == topic && candidate.message == message) {
+            return true;
+        }
     }
     return false;
 }

@@ -90,6 +90,8 @@ private:
     void failAllPendingPublishes(const QString &reason);
     bool confirmPendingPublish(const ProtocolAdapter::Frame &frame);
     bool failPendingPublish(const ProtocolAdapter::Frame &frame, const QString &reason);
+    void rememberOwnPublish(const PendingPublish &publish);
+    bool isOwnPublishEcho(const QString &topic, const QString &user, const QString &message);
     int nextPacketId();
     int nextRequestId();
 
@@ -99,6 +101,7 @@ private:
     QString m_nickname = QStringLiteral("guest");
     QSet<QString> m_channels;
     QQueue<PendingPublish> m_pendingPublishes;
+    QQueue<PendingPublish> m_recentOwnPublishes;
     QSet<QString> m_pendingSubscribeAfterCreate;
     int m_nextPacketId = 1;
     int m_nextRequestId = 1;
