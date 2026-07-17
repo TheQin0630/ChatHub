@@ -1,5 +1,13 @@
 # ChatHub
 
+> 当前发布版本：v0.1.2。Windows x64 运行包见 [GitHub Releases](https://github.com/TheQin0630/ChatHub/releases)。
+
+## v0.1.2 更新
+
+- 修复服务端回显导致本机消息被重复显示为“他人消息”的问题。
+- 保持 QoS1 `DeliverAck` 确认逻辑，避免隐藏回显时影响可靠投递。
+- 发布包已使用 Qt 6.11.1 MinGW 64-bit 进行 Release 构建并收集运行依赖。
+
 ChatHub 是一个基于 Qt 6 / QML 的桌面聊天室客户端，用 topic 发布/订阅模型包装聊天室频道。客户端通过 TCP 连接课程联调服务器，支持订阅频道、退订频道、发送消息、接收消息、查看服务端频道列表、查看本地日志、设置连接级规则，并提供中英文切换、深浅主题切换和 Windows 可执行包部署。
 
 ## 最新发布
